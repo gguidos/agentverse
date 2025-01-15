@@ -1,0 +1,43 @@
+name: collaborative_chat
+description: "Multiple agents collaborating on a task"
+
+agents:
+  - name: expert
+    type: gpt4
+    role: "Python Expert"
+    memory:
+      type: vector
+    llm:
+      type: gpt-4
+    parser:
+      type: json
+    manipulators: ["summary", "reflection"]
+    
+  - name: assistant
+    type: basic
+    role: "Helper"
+    memory_type: simple
+    manipulators: ["summary"]
+    llm_type: gpt-3.5-turbo
+
+environment:
+  type: chat
+  max_rounds: 10
+  turn_taking: sequential
+
+output_parser:
+  type: json
+  schema:
+    response: str
+    confidence: float
+    reasoning: str 
+
+evaluation:
+  type: per_agent
+  metrics:
+    - coherence
+    - relevance
+    - accuracy
+  thresholds:
+    min_score: 0.7
+    max_retries: 3 

@@ -1,0 +1,11 @@
+groups:
+  - name: example_alerts
+    rules:
+      - alert: HighRequestRate
+        expr: rate(http_requests_total[1m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: High request rate detected
+          description: "Request rate is above 10 requests per minute."

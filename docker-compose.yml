@@ -1,0 +1,86 @@
+services:
+  # Define the FastAPI Microservice
+  microservice:
+    build: .
+    container_name: fastapi_microservice
+    environment:
+      - ENVIRONMENT=development
+      - MONGO_URI=${MONGO_URI}
+      - DB_NAME=${DB_NAME}
+      - DB_COLLECTION=${DB_COLLECTION}
+      - REDIS_URL=${REDIS_URL}
+      - REDIS_SESSION_KEY_PREFIX=${REDIS_SESSION_KEY_PREFIX}
+      - LOG_LEVEL=${LOG_LEVEL}
+      - PORT=${PORT}
+      - RABBITMQ_HOST=${RABBITMQ_HOST}
+      - RABBITMQ_PORT=${RABBITMQ_PORT}
+      - RABBITMQ_USER=${RABBITMQ_USER}
+      - RABBITMQ_PASS=${RABBITMQ_PASS}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_REGION=${AWS_REGION}
+      - AWS_DOCUMENTS_BUCKET=${AWS_DOCUMENTS_BUCKET}
+      - AWS_DATA_BUCKET=${AWS_DATA_BUCKET}
+      - DATA_DIR=${DATA_DIR}
+      - CHROMA_PATH=${CHROMA_PATH}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo
+      - prometheus
+      - redis
+    networks:
+      - monitoring
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MongoDB Service
+  mongo:
+    image: mongo:4.4
+    container_name: mongo
+    ports:
+      - "27017:27017"
+    networks:
+      - monitoring
+
+  # Prometheus Service
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring
+
+  # Grafana Service
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+
+  # Add Redis Service
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - monitoring
+
+networks:
+  monitoring:
+    driver: bridge

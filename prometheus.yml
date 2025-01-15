@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s  # How often to scrape targets
+
+scrape_configs:
+  - job_name: 'fastapi_microservice'
+    scrape_interval: 5s  # How often to scrape this target
+    metrics_path: '/internal/metrics'  # Path to the metrics endpoint
+    static_configs:
+      - targets: ['microservice:8000']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - 'alertmanager:9093'
+
+rule_files:
+  - 'alerts.yml'
