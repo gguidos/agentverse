@@ -4,6 +4,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 import logging
+from src.core.agentverse.memory.exception_handlers import register_memory_exception_handlers
 
 # Create a logger instance
 logger = logging.getLogger(__name__)
@@ -73,6 +74,9 @@ def register_exception_handlers(app):
             status_code=500,
             content={"status": "error", "data": None, "message": "An unexpected error occurred."},
         )
+
+    # Register memory-specific handlers
+    register_memory_exception_handlers(app)
 
 class DuplicateUserException(HTTPException):
     def __init__(self, email: str):
