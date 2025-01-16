@@ -7,7 +7,7 @@ from src.core.agentverse.services.embedding.base import (
     EmbeddingConfig
 )
 from src.core.agentverse.exceptions import EmbeddingError
-from src.core.infrastructure.aws.get_embeddings import GetEmbeddings
+from src.core.infrastructure.aws.get_embedings import GetEmbeddings
 
 logger = logging.getLogger(__name__)
 

@@ -1,132 +1,80 @@
-from typing import Dict, Any, Optional, List, Union
-import logging
+"""
+Base memory interface
+"""
 
-from src.core.agentverse.memory.types import MemoryConfig, MemoryData
+from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
+from datetime import datetime
+
+from src.core.agentverse.message import Message
 from src.core.agentverse.exceptions import MemoryError
 
-logger = logging.getLogger(__name__)
-
-class BaseMemory:
-    """Base memory class"""
+class BaseMemory(ABC):
+    """Abstract base class for memory implementations"""
     
-    def __init__(
-        self,
-        backend: 'BaseBackend',  # Type hint with string to avoid circular import
-        manipulator: 'BaseManipulator',  # Type hint with string to avoid circular import
-        config: Optional[MemoryConfig] = None
-    ):
-        """Initialize memory
-        
-        Args:
-            backend: Memory backend
-            manipulator: Memory manipulator
-            config: Optional memory configuration
-        """
-        self.backend = backend
-        self.manipulator = manipulator
-        self.config = config or MemoryConfig(
-            backend_type="vector",
-            backend_name="faiss"
-        )
-    
+    @abstractmethod
     async def store(
         self,
-        data: Union[Dict[str, Any], List[Dict[str, Any]]],
-        **kwargs
+        message: Message,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> None:
-        """Store data in memory
+        """Store message in memory
         
         Args:
-            data: Data to store
-            **kwargs: Additional storage options
+            message: Message to store
+            metadata: Optional metadata
             
         Raises:
             MemoryError: If storage fails
         """
-        try:
-            # Manipulate data
-            processed_data = await self.manipulator.process_store(data)
-            
-            # Store in backend
-            await self.backend.store(processed_data, **kwargs)
-            
-        except Exception as e:
-            logger.error(f"Memory storage failed: {str(e)}")
-            raise MemoryError(f"Storage failed: {str(e)}")
+        pass
     
+    @abstractmethod
     async def retrieve(
         self,
-        query: Union[str, Dict[str, Any]],
-        **kwargs
-    ) -> List[Dict[str, Any]]:
-        """Retrieve data from memory
+        query: str,
+        k: int = 5
+    ) -> List[Message]:
+        """Retrieve messages from memory
         
         Args:
             query: Search query
-            **kwargs: Additional retrieval options
+            k: Number of results to return
             
         Returns:
-            Retrieved data
+            List of matching messages
             
         Raises:
             MemoryError: If retrieval fails
         """
-        try:
-            # Process query
-            processed_query = await self.manipulator.process_query(query)
-            
-            # Search backend
-            results = await self.backend.search(processed_query, **kwargs)
-            
-            # Post-process results
-            processed_results = await self.manipulator.process_results(results)
-            
-            return processed_results
-            
-        except Exception as e:
-            logger.error(f"Memory retrieval failed: {str(e)}")
-            raise MemoryError(f"Retrieval failed: {str(e)}")
+        pass
     
-    async def clear(self, **kwargs) -> None:
-        """Clear memory
+    @abstractmethod
+    async def clear(self) -> None:
+        """Clear all messages from memory
         
-        Args:
-            **kwargs: Additional clear options
-            
         Raises:
             MemoryError: If clear fails
         """
-        try:
-            await self.backend.clear(**kwargs)
-            
-        except Exception as e:
-            logger.error(f"Memory clear failed: {str(e)}")
-            raise MemoryError(f"Clear failed: {str(e)}")
+        pass
     
-    async def _validate_data(
-        self,
-        data: Union[Dict[str, Any], List[Dict[str, Any]]]
-    ) -> None:
-        """Validate input data
+    async def get_stats(self) -> Dict[str, Any]:
+        """Get memory statistics
+        
+        Returns:
+            Dictionary of statistics
+        """
+        return {
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    
+    async def validate_message(self, message: Message) -> bool:
+        """Validate message before storage
         
         Args:
-            data: Data to validate
+            message: Message to validate
             
-        Raises:
-            ValueError: If data is invalid
+        Returns:
+            Whether message is valid
         """
-        if isinstance(data, list):
-            if not all(isinstance(d, dict) for d in data):
-                raise ValueError("List items must be dictionaries")
-        elif not isinstance(data, dict):
-            raise ValueError("Data must be dictionary or list of dictionaries")
-    
-    async def _check_size_limit(self) -> None:
-        """Check memory size limit
-        
-        Raises:
-            MemoryError: If size limit exceeded
-        """
-        if self.config.max_size:
-            # Implement size checking
-            pass 
+        return bool(message.content and message.type and message.role) 

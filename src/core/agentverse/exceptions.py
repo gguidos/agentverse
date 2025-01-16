@@ -1,157 +1,261 @@
 """
 AgentVerse Exceptions Module
 
-This module defines custom exceptions used throughout AgentVerse.
+This module defines custom exceptions used throughout the AgentVerse framework.
 """
 
 class AgentVerseError(Exception):
-    """Base exception for AgentVerse errors"""
+    """Base exception for all AgentVerse errors"""
+    
     def __init__(self, message: str, details: dict = None):
         self.message = message
         self.details = details or {}
         super().__init__(self.message)
 
-# Backend Errors
-class BackendError(AgentVerseError):
-    """Base backend error"""
+# Parser Errors
+class ParserError(AgentVerseError):
+    """Base class for parser-related errors"""
     pass
 
-class VectorBackendError(BackendError):
-    """Vector backend error"""
+class ValidationParserError(ParserError):
+    """Raised when parser validation fails"""
     pass
 
-class StorageBackendError(BackendError):
-    """Storage backend error"""
+class SchemaParserError(ParserError):
+    """Raised when schema validation fails"""
     pass
 
-class DatabaseBackendError(BackendError):
-    """Database backend error"""
+# Component Errors
+class ComponentError(AgentVerseError):
+    """Base class for component-related errors"""
+    pass
+
+class ComponentNotFoundError(ComponentError):
+    """Raised when a component is not found"""
+    pass
+
+class ComponentInitError(ComponentError):
+    """Raised when component initialization fails"""
+    pass
+
+# Agent Errors
+class AgentError(AgentVerseError):
+    """Base class for agent-related errors"""
+    pass
+
+class AgentStateError(AgentError):
+    """Raised when agent state operations fail"""
+    pass
+
+class AgentConfigError(AgentError):
+    """Raised when agent configuration is invalid"""
+    pass
+
+class AgentExecutionError(AgentError):
+    """Raised when agent execution fails"""
+    pass
+
+class AgentCommunicationError(AgentError):
+    """Raised when agent communication fails"""
+    pass
+
+# Registry Errors
+class RegistryError(AgentVerseError):
+    """Base class for registry-related errors"""
+    pass
+
+class RegistrationError(RegistryError):
+    """Raised when registration operations fail"""
+    pass
+
+class LookupError(RegistryError):
+    """Raised when registry lookups fail"""
     pass
 
 # Memory Errors
 class MemoryError(AgentVerseError):
-    """Memory error"""
-    pass
-
-class MemoryManipulationError(MemoryError):
-    """Memory manipulation error"""
+    """Base class for memory-related errors"""
     pass
 
 class MemoryStorageError(MemoryError):
-    """Memory storage error"""
+    """Raised when storing data in memory fails"""
     pass
 
 class MemoryRetrievalError(MemoryError):
-    """Memory retrieval error"""
+    """Raised when retrieving data from memory fails"""
+    pass
+
+class MemoryManipulationError(MemoryError):
+    """Raised when manipulating memory data fails"""
+    pass
+
+# Backend Errors
+class BackendError(AgentVerseError):
+    """Base class for backend-related errors"""
+    pass
+
+class VectorBackendError(BackendError):
+    """Raised when vector operations fail"""
+    pass
+
+class StorageBackendError(BackendError):
+    """Raised when storage operations fail"""
+    pass
+
+class DatabaseBackendError(BackendError):
+    """Raised when database operations fail"""
     pass
 
 # Service Errors
-class LLMError(AgentVerseError):
-    """LLM service error"""
+class ServiceError(AgentVerseError):
+    """Base class for service-related errors"""
     pass
 
-class AgentError(AgentVerseError):
-    """Agent error"""
+class LLMError(ServiceError):
+    """Raised when LLM service calls fail"""
     pass
 
-class EvaluationError(AgentVerseError):
-    """Evaluation error"""
+# Monitoring Errors
+class MonitoringError(AgentVerseError):
+    """Base class for monitoring-related errors"""
     pass
 
-# System Errors
-class ConfigError(AgentVerseError):
-    """Configuration error"""
+class MetricsError(MonitoringError):
+    """Raised when metrics collection fails"""
     pass
 
-class MessageBusError(AgentVerseError):
-    """Message bus error"""
+class AlertError(MonitoringError):
+    """Raised when alert processing fails"""
     pass
 
-class ValidationError(AgentVerseError):
-    """Validation error"""
-    pass
-
-# Security Errors
-class AuthenticationError(AgentVerseError):
-    """Authentication error"""
-    pass
-
-class AuthorizationError(AgentVerseError):
-    """Authorization error"""
+class TraceError(MonitoringError):
+    """Raised when trace collection fails"""
     pass
 
 # Operation Errors
-class RateLimitError(AgentVerseError):
-    """Rate limit error"""
+class ActionError(AgentVerseError):
+    """Raised when an agent action fails"""
+    pass
+
+class MessageBusError(AgentVerseError):
+    """Raised when message bus operations fail"""
+    pass
+
+class ConfigError(AgentVerseError):
+    """Raised when configuration is invalid"""
+    pass
+
+class ValidationError(AgentVerseError):
+    """Raised when validation fails"""
+    pass
+
+class ResourceError(AgentVerseError):
+    """Raised when resource limits are exceeded"""
+    pass
+
+class StateError(AgentVerseError):
+    """Raised when state operations fail"""
+    pass
+
+class EnvironmentError(AgentVerseError):
+    """Raised when environment operations fail"""
+    pass
+
+class TaskError(AgentVerseError):
+    """Raised when task operations fail"""
+    pass
+
+class ToolError(AgentVerseError):
+    """Raised when tool operations fail"""
+    pass
+
+# Security Errors
+class SecurityError(AgentVerseError):
+    """Base class for security-related errors"""
+    pass
+
+class AuthenticationError(SecurityError):
+    """Raised when authentication fails"""
+    pass
+
+class AuthorizationError(SecurityError):
+    """Raised when authorization fails"""
+    pass
+
+# Rate Limiting Errors
+class RateLimitError(ResourceError):
+    """Raised when rate limits are exceeded"""
     pass
 
 class TimeoutError(AgentVerseError):
-    """Timeout error"""
+    """Raised when operations timeout"""
     pass
 
-class NotFoundError(AgentVerseError):
-    """Resource not found error"""
-    pass
-
-class DuplicateError(AgentVerseError):
-    """Duplicate resource error"""
-    pass
-
-# Error registry
-ERROR_TYPES = {
-    # Backend errors
-    'backend': BackendError,
-    'vector_backend': VectorBackendError,
-    'storage_backend': StorageBackendError,
-    'database_backend': DatabaseBackendError,
+__all__ = [
+    # Base
+    "AgentVerseError",
     
-    # Memory errors
-    'memory': MemoryError,
-    'memory_manipulation': MemoryManipulationError,
-    'memory_storage': MemoryStorageError,
-    'memory_retrieval': MemoryRetrievalError,
+    # Parser
+    "ParserError",
+    "ValidationParserError",
+    "SchemaParserError",
     
-    # Service errors
-    'llm': LLMError,
-    'agent': AgentError,
-    'evaluation': EvaluationError,
+    # Component
+    "ComponentError",
+    "ComponentNotFoundError",
+    "ComponentInitError",
     
-    # System errors
-    'config': ConfigError,
-    'message_bus': MessageBusError,
-    'validation': ValidationError,
+    # Agent
+    "AgentError",
+    "AgentStateError",
+    "AgentConfigError",
+    "AgentExecutionError",
+    "AgentCommunicationError",
     
-    # Security errors
-    'auth': AuthenticationError,
-    'authorization': AuthorizationError,
+    # Registry
+    "RegistryError",
+    "RegistrationError",
+    "LookupError",
     
-    # Operation errors
-    'rate_limit': RateLimitError,
-    'timeout': TimeoutError,
-    'not_found': NotFoundError,
-    'duplicate': DuplicateError
-}
-
-def create_error(
-    type: str,
-    message: str,
-    details: dict = None
-) -> AgentVerseError:
-    """Create error of specified type
+    # Memory
+    "MemoryError",
+    "MemoryStorageError",
+    "MemoryRetrievalError",
+    "MemoryManipulationError",
     
-    Args:
-        type: Error type
-        message: Error message
-        details: Optional error details
-        
-    Returns:
-        Error instance
-        
-    Raises:
-        ValueError: If type is invalid
-    """
-    if type not in ERROR_TYPES:
-        raise ValueError(f"Invalid error type: {type}")
-        
-    error_class = ERROR_TYPES[type]
-    return error_class(message, details) 
+    # Backend
+    "BackendError",
+    "VectorBackendError",
+    "StorageBackendError",
+    "DatabaseBackendError",
+    
+    # Service
+    "ServiceError",
+    "LLMError",
+    
+    # Monitoring
+    "MonitoringError",
+    "MetricsError",
+    "AlertError",
+    "TraceError",
+    
+    # Operation
+    "ActionError",
+    "MessageBusError",
+    "ConfigError",
+    "ValidationError",
+    "ResourceError",
+    "StateError",
+    "EnvironmentError",
+    "TaskError",
+    "ToolError",
+    
+    # Security
+    "SecurityError",
+    "AuthenticationError",
+    "AuthorizationError",
+    
+    # Rate Limiting
+    "RateLimitError",
+    "TimeoutError"
+] 

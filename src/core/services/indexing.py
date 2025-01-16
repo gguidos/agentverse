@@ -1,63 +1,39 @@
+"""Indexing Service Module"""
+
+from typing import Dict, Any, Optional, List
+from langchain_community.vectorstores import Chroma  # Updated import
+from langchain.embeddings import OpenAIEmbeddings
 import logging
-from langchain.schema.document import Document
-from langchain.vectorstores.chroma import Chroma
-from src.core.infrastructure.db.chromadb import ChromaDB
-from src.core.infrastructure.fs.split_document import SplitDocument
-from src.core.infrastructure.aws.get_embedings import GetEmbeddings
-from src.core.utils.calculate_chunk_ids import CalculateChunkIds
-import os
 
 logger = logging.getLogger(__name__)
 
 class IndexingService:
+    """Document indexing service"""
+    
     def __init__(
-            self,
-            chroma_db: ChromaDB,
-            split_document: SplitDocument,
-            calculate_chunk_ids: CalculateChunkIds,
-            embeddings_client: GetEmbeddings
+        self,
+        embedding_model: str = "text-embedding-ada-002",
+        persist_directory: str = "./indexes"
     ):
-        self.chroma_db = chroma_db
-        self.split_document = split_document
-        self.calculate_chunk_ids = calculate_chunk_ids
-        self.get_embedings = embeddings_client
-
-    async def index_documents(self, store_name: str, documents: list[Document]):
-        """Index the provided documents in the specified collection."""
-        logger.info(f"Indexing {len(documents)} documents in collection: {store_name}.")
+        """Initialize indexing service
         
+        Args:
+            embedding_model: OpenAI embedding model
+            persist_directory: Directory to persist indexes
+        """
+        self.embeddings = OpenAIEmbeddings(model=embedding_model)
+        self.persist_directory = persist_directory
+        self.vectorstore = None
+        
+    async def initialize(self) -> None:
+        """Initialize vector store"""
         try:
-            EMBEDDING = self.get_embedings.get_embedding_function()
-            CHROMA_PATH = os.getenv("CHROMA_PATH")
-            DB = Chroma(
-                collection_name=store_name,
-                persist_directory=CHROMA_PATH,
-                embedding_function=EMBEDDING
+            self.vectorstore = Chroma(
+                persist_directory=self.persist_directory,
+                embedding_function=self.embeddings
             )
+            logger.info("Initialized indexing service")
             
-            chunks = self.split_document.split_document(documents)
-
-            # Calculate Page IDs.
-            chunks_with_ids = self.calculate_chunk_ids.calculate_chunk_ids(chunks)
-            existing_items = DB.get(include=[])  # IDs are always included by default
-            existing_ids = set(existing_items["ids"])
-            
-            # Only add documents that don't exist in the DB.
-            new_chunks = []
-            for chunk in chunks_with_ids:
-                if chunk.metadata["id"] not in existing_ids:
-                    new_chunks.append(chunk)
-            
-            if len(new_chunks):
-                logger.info(f"Indexed {len(new_chunks)} new documents.")
-                new_chunk_ids = [chunk.metadata["id"] for chunk in new_chunks]
-                DB.add_documents(new_chunks, ids=new_chunk_ids)
-                DB.persist()
-            else:
-                logger.info("✅ No new documents to add.")
-            
-            logger.info("Indexing completed.")
-        
         except Exception as e:
-            logger.error(f"Error during indexing: {str(e)}")
+            logger.error(f"Indexing service initialization failed: {str(e)}")
             raise

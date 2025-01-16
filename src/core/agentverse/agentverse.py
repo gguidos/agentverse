@@ -9,6 +9,9 @@ from src.core.agentverse.environment.base import BaseEnvironment
 from src.core.agentverse.system.task_loader import TaskLoader
 from src.core.agentverse.exceptions import AgentVerseError
 from src.core.agentverse.monitoring.agent_monitor import AgentMonitor
+from src.core.agentverse.recovery import RetryHandler, RetryConfig
+from src.core.infrastructure.circuit_breaker import circuit_breaker
+from src.core.agentverse.resources import ResourceManager
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +23,15 @@ class AgentVerseConfig(BaseModel):
     validate_agents: bool = True
     save_history: bool = True
     output_dir: Path = Field(default=Path("output"))
+    retry: RetryConfig = Field(default_factory=RetryConfig)
+    enable_recovery: bool = True
+    
+    # Resource limits
+    llm_rate_limit: int = 100  # Calls per minute
+    llm_burst_limit: int = 20
+    embedding_rate_limit: int = 1000  # Calls per minute
+    memory_quota: float = 1024 * 1024 * 1024  # 1GB
+    max_concurrent_tasks: int = 10
     
     model_config = ConfigDict(
         arbitrary_types_allowed=True
@@ -54,6 +66,36 @@ class AgentVerse:
         self.step_count = 0
         self.history: List[Dict[str, Any]] = []
         logger.info(f"Initialized {self.name} v{self.version}")
+        
+        # Initialize recovery mechanisms
+        if self.config.enable_recovery:
+            self.retry = RetryHandler(config=self.config.retry)
+        
+        # Initialize resource manager
+        self.resources = ResourceManager()
+        
+        # Add rate limiters
+        self.resources.add_rate_limiter(
+            "llm_calls",
+            rate=self.config.llm_rate_limit,
+            burst=self.config.llm_burst_limit
+        )
+        self.resources.add_rate_limiter(
+            "embeddings",
+            rate=self.config.embedding_rate_limit
+        )
+        
+        # Add quotas
+        self.resources.add_quota(
+            "memory",
+            max_usage=self.config.memory_quota,
+            unit="bytes",
+            reset_interval=3600  # Reset hourly
+        )
+        self.resources.add_quota(
+            "concurrent_tasks",
+            max_usage=self.config.max_concurrent_tasks
+        )
     
     @classmethod
     async def from_task(
@@ -119,23 +161,21 @@ class AgentVerse:
             )
     
     async def run(self) -> List[Dict[str, Any]]:
-        """Run environment until completion
-        
-        Returns:
-            List of step results
+        """Run environment with recovery mechanisms"""
+        if not self.config.enable_recovery:
+            return await self._run_without_recovery()
             
-        Raises:
-            AgentVerseError: If run fails
-        """
         try:
             if self.config.auto_reset:
-                await self.reset()
+                await self.retry.wrap(self.reset)()
             
             while not self._should_stop():
-                result = await self.step()
+                # Use existing circuit breaker with retry
+                result = await circuit_breaker(self.retry.wrap(self.step))()
+                
                 if self.config.save_history:
                     self.history.append(result)
-                
+            
             return self.history if self.config.save_history else []
             
         except Exception as e:
@@ -148,45 +188,48 @@ class AgentVerse:
                 }
             )
     
-    async def step(self, *args, **kwargs) -> Dict[str, Any]:
-        """Execute one environment step
-        
-        Returns:
-            Step result
-            
-        Raises:
-            AgentVerseError: If step fails
-        """
+    async def _handle_circuit_open(self) -> None:
+        """Handle circuit breaker open state"""
         try:
-            start_time = asyncio.get_event_loop().time()
-            
-            # Execute step
-            result = await self.environment.step(*args, **kwargs)
-            self.step_count += 1
-            
-            # Track metrics
-            if self.monitor and self.config.track_metrics:
-                duration = asyncio.get_event_loop().time() - start_time
-                self.monitor.track_task(
-                    agent_id="environment",
-                    status="success",
-                    duration=duration
-                )
-            
-            return result
-            
+            # Try to save state
+            await self._save_state()
+            # Notify monitoring
+            if self.monitor:
+                self.monitor.alert("circuit_breaker_open")
         except Exception as e:
-            logger.error(f"Environment step failed: {str(e)}")
+            logger.error(f"Failed to handle circuit open: {str(e)}")
+    
+    async def _handle_run_error(self, error: Exception) -> None:
+        """Handle run errors"""
+        try:
+            # Save error state
+            await self._save_state()
+            # Record error metrics
             if self.monitor:
                 self.monitor.track_error(
                     agent_id="environment",
-                    error_type="step_error",
-                    error=str(e)
+                    error_type=error.__class__.__name__,
+                    error=str(error)
                 )
-            raise AgentVerseError(
-                message=f"Step failed: {str(e)}",
-                details={"step": self.step_count}
-            )
+        except Exception as e:
+            logger.error(f"Failed to handle run error: {str(e)}")
+    
+    async def step(self, *args, **kwargs) -> Dict[str, Any]:
+        """Execute step with resource management"""
+        # Check concurrent task quota
+        if not await self.resources.check_quota("concurrent_tasks", 1):
+            raise AgentVerseError("Maximum concurrent tasks exceeded")
+        
+        try:
+            # Use rate limiter for step execution
+            async with self.resources.rate_limiters["llm_calls"]:
+                result = await super().step(*args, **kwargs)
+            
+            return result
+            
+        finally:
+            # Release task quota
+            await self.resources.check_quota("concurrent_tasks", -1)
     
     async def reset(self) -> None:
         """Reset environment and agents
@@ -231,18 +274,7 @@ class AgentVerse:
         return False
     
     def get_metrics(self) -> Dict[str, Any]:
-        """Get execution metrics
-        
-        Returns:
-            Metrics dictionary
-        """
-        metrics = {
-            "steps": self.step_count,
-            "agents": len(self.agents),
-            "history_size": len(self.history)
-        }
-        
-        if self.monitor:
-            metrics.update(self.monitor.get_metrics())
-            
+        """Get metrics including resource usage"""
+        metrics = super().get_metrics()
+        metrics["resources"] = self.resources.get_metrics()
         return metrics 
