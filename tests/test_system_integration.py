@@ -1,144 +1,85 @@
+"""
+System integration tests
+"""
+
 import pytest
-import logging
-from src.core.agentverse import AgentVerse, AgentVerseConfig
-from src.core.agentverse.agents import create_agent, AssistantAgentConfig
-from src.core.agentverse.message import Message
-from src.core.agentverse.message_bus import create_message_bus, MessageBusType
-from src.core.agentverse.resources import ResourceManager
+from typing import List
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from src.core.agentverse.message_bus import InMemoryMessageBus
+from src.core.agentverse.message import Message, MessageType, MessageRole
+from src.core.agentverse.agents import BaseAgent
+from src.core.agentverse.agents.user import UserAgent
+from src.core.agentverse.exceptions import MessageBusError
+from src.core.agentverse.testing.mocks import MockLLM
+
+@pytest.fixture
+async def llm_service():
+    """Create mock LLM service"""
+    return MockLLM()
+
+@pytest.fixture
+async def message_bus():
+    """Create message bus for testing"""
+    bus = InMemoryMessageBus()
+    yield bus
+
+@pytest.fixture
+async def test_agents(llm_service) -> List[BaseAgent]:
+    """Create test agents"""
+    agents = [
+        UserAgent(
+            name="test_user_1",
+            user_id="user1",
+            llm_service=llm_service
+        ),
+        UserAgent(
+            name="test_user_2", 
+            user_id="user2",
+            llm_service=llm_service
+        )
+    ]
+    return agents
+
+async def test_basic_system_setup(message_bus, test_agents):
+    """Test basic system setup and message flow"""
+    
+    # Subscribe agents to topics
+    topic = "test_topic"
+    for agent in test_agents:
+        await message_bus.subscribe(topic, agent.name)
+    
+    # Verify subscriptions
+    subscribers = await message_bus.get_subscribers(topic)
+    assert len(subscribers) == len(test_agents)
+    
+    # Test message publishing
+    test_message = Message(
+        content="Test message",
+        type=MessageType.SYSTEM,
+        role=MessageRole.SYSTEM,
+        sender_id="system",
+        receiver_id="all"
+    )
+    
+    await message_bus.publish(topic, test_message)
+    
+    # Verify message was stored
+    topics = await message_bus.get_topics()
+    assert topic in topics
+    
+    # Test unsubscribe
+    await message_bus.unsubscribe(topic, test_agents[0].name)
+    subscribers = await message_bus.get_subscribers(topic)
+    assert len(subscribers) == len(test_agents) - 1
 
 @pytest.mark.asyncio
-async def test_basic_system_setup():
-    """Test basic system initialization"""
+async def test_message_bus_errors(message_bus):
+    """Test message bus error handling"""
     
-    # 1. Create message bus
-    try:
-        bus = create_message_bus(MessageBusType.MEMORY)  # Use in-memory for testing
-        await bus.connect()
-        logger.info("✓ Message bus created successfully")
-    except Exception as e:
-        logger.error(f"✗ Message bus creation failed: {e}")
-        raise
-
-    # 2. Create resource manager
-    try:
-        resources = ResourceManager()
-        resources.add_rate_limiter("llm_calls", rate=10)
-        resources.add_quota("memory", max_usage=1024**2)
-        logger.info("✓ Resource manager initialized")
-    except Exception as e:
-        logger.error(f"✗ Resource manager setup failed: {e}")
-        raise
-
-    # 3. Create agent
-    try:
-        config = AssistantAgentConfig(
-            name="test_assistant",
-            system_prompt="You are a test assistant.",
-            temperature=0.7
-        )
-        agent = create_agent("assistant", config)
-        logger.info("✓ Agent created successfully")
-    except Exception as e:
-        logger.error(f"✗ Agent creation failed: {e}")
-        raise
-
-    # 4. Create AgentVerse
-    try:
-        verse_config = AgentVerseConfig(
-            max_steps=10,
-            track_metrics=True
-        )
-        agentverse = AgentVerse(
-            agents=[agent],
-            message_bus=bus,
-            resources=resources,
-            config=verse_config
-        )
-        logger.info("✓ AgentVerse initialized")
-    except Exception as e:
-        logger.error(f"✗ AgentVerse creation failed: {e}")
-        raise
-
-    # 5. Test basic message flow
-    try:
-        message = Message.user(
-            content="Hello, is the system working?",
-            sender_id="test_user"
-        )
-        response = await agentverse.process_message(message)
-        assert response.content, "Response should not be empty"
-        logger.info("✓ Message processing working")
-    except Exception as e:
-        logger.error(f"✗ Message processing failed: {e}")
-        raise
-
-    # 6. Test resource limits
-    try:
-        async with resources.rate_limiters["llm_calls"]:
-            assert await resources.check_quota("memory", 1024)
-        logger.info("✓ Resource management working")
-    except Exception as e:
-        logger.error(f"✗ Resource management failed: {e}")
-        raise
-
-    # 7. Get metrics
-    try:
-        metrics = agentverse.get_metrics()
-        assert "steps" in metrics
-        assert "resources" in metrics
-        logger.info("✓ Metrics collection working")
-    except Exception as e:
-        logger.error(f"✗ Metrics collection failed: {e}")
-        raise
-
-    # Cleanup
-    try:
-        await agentverse.cleanup()
-        logger.info("✓ System cleanup successful")
-    except Exception as e:
-        logger.error(f"✗ System cleanup failed: {e}")
-        raise
-
-@pytest.mark.asyncio
-async def test_error_handling():
-    """Test system error handling"""
+    # Test invalid topic subscription
+    with pytest.raises(MessageBusError):
+        await message_bus.subscribe(None, "test_agent")
     
-    agentverse = None
-    try:
-        # Create system with invalid config to test error handling
-        config = AgentVerseConfig(
-            max_steps=-1  # Invalid value
-        )
-        agentverse = AgentVerse(
-            agents=[],  # Empty agents list should raise error
-            config=config
-        )
-        assert False, "Should have raised ConfigError"
-    except Exception as e:
-        logger.info("✓ Error handling working as expected")
-    finally:
-        if agentverse:
-            await agentverse.cleanup()
-
-def run_all_tests():
-    """Run all system tests"""
-    import asyncio
-    
-    async def run_tests():
-        logger.info("Starting system integration tests...")
-        
-        try:
-            await test_basic_system_setup()
-            await test_error_handling()
-            logger.info("✓ All tests passed successfully")
-        except Exception as e:
-            logger.error(f"✗ Tests failed: {e}")
-            raise
-    
-    asyncio.run(run_tests())
-
-if __name__ == "__main__":
-    run_all_tests() 
+    # Test invalid message publishing
+    with pytest.raises(MessageBusError):
+        await message_bus.publish("topic", None) 

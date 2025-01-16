@@ -26,8 +26,13 @@ class EvaluationResult(BaseModel):
     
     model_config = {
         "arbitrary_types_allowed": True,
-        "json_encoders": {
-            datetime: lambda v: v.isoformat()
+        "ser_json_timedelta": "iso8601",
+        "json_schema_extra": {
+            "examples": [{
+                "success": True,
+                "score": 0.95,
+                "metrics": []
+            }]
         }
     }
 

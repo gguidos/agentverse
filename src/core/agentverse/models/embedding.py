@@ -29,14 +29,18 @@ class EmbeddingResult(BaseModel):
     distance: Optional[float] = None
     rank: Optional[int] = None
     
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        validate_assignment=True,
-        json_encoders={
-            np.ndarray: lambda x: x.tolist(),
-            datetime: lambda dt: dt.isoformat()
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "validate_assignment": True,
+        "ser_json_timedelta": "iso8601",
+        "json_schema_extra": {
+            "examples": [{
+                "content": "Sample text",
+                "score": 0.95,
+                "distance": 0.05
+            }]
         }
-    )
+    }
     
     @classmethod
     def from_vector(
@@ -143,3 +147,10 @@ class EmbeddingResult(BaseModel):
             f"content='{self.content[:50]}...'"
             f")"
         ) 
+    
+    def model_dump(self, *args, **kwargs) -> Dict[str, Any]:
+        """Custom serialization with numpy array handling"""
+        data = super().model_dump(*args, **kwargs)
+        if isinstance(data.get('embedding'), np.ndarray):
+            data['embedding'] = data['embedding'].tolist()
+        return data 

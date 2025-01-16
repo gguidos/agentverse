@@ -1,76 +1,80 @@
 """
-AgentVerse Message Bus Module
-
-This module provides message bus implementations for agent communication.
-It includes different message bus backends and common messaging patterns.
-
-Key Components:
-    - BaseMessageBus: Abstract base class for message buses
-    - RedisMessageBus: Redis-based message bus implementation
-    - InMemoryMessageBus: In-memory message bus for testing
-    - MessageTypes: Enumeration of message types
+Message bus implementations
 """
 
-import logging
-from enum import Enum
-from typing import Optional, Type
-
-from src.core.agentverse.message_bus.base import BaseMessageBus
-from src.core.agentverse.message_bus.redis import RedisMessageBus  # Updated name
-from src.core.agentverse.message_bus.memory import InMemoryMessageBus
+from typing import Dict, List, Optional, Set
+from src.core.agentverse.message import Message
 from src.core.agentverse.exceptions import MessageBusError
 
-logger = logging.getLogger(__name__)
-
-class MessageTypes(str, Enum):
-    """Message type enumeration"""
-    COMMAND = "command"
-    EVENT = "event"
-    RESPONSE = "response"
-    ERROR = "error"
-
-class MessageBusType(str, Enum):
-    """Message bus type enumeration"""
-    REDIS = "redis"
-    MEMORY = "memory"
-
-def create_message_bus(
-    bus_type: MessageBusType,
-    **kwargs
-) -> BaseMessageBus:
-    """Create message bus instance
+class BaseMessageBus:
+    """Base message bus interface"""
     
-    Args:
-        bus_type: Type of message bus to create
-        **kwargs: Additional configuration arguments
+    async def subscribe(self, topic: str, subscriber: str) -> None:
+        """Subscribe to topic"""
+        pass
         
-    Returns:
-        Configured message bus instance
+    async def unsubscribe(self, topic: str, subscriber: str) -> None:
+        """Unsubscribe from topic"""
+        pass
         
-    Raises:
-        MessageBusError: If creation fails
-    """
-    bus_classes: dict[MessageBusType, Type[BaseMessageBus]] = {
-        MessageBusType.REDIS: RedisMessageBus,
-        MessageBusType.MEMORY: InMemoryMessageBus
-    }
+    async def publish(self, topic: str, message: Message) -> None:
+        """Publish message to topic"""
+        pass
+        
+    async def get_subscribers(self, topic: str) -> List[str]:
+        """Get subscribers for topic"""
+        pass
+        
+    async def get_topics(self) -> List[str]:
+        """Get all topics"""
+        pass
+
+class InMemoryMessageBus(BaseMessageBus):
+    """In-memory message bus implementation"""
     
-    try:
-        bus_class = bus_classes[bus_type]
-        return bus_class(**kwargs)
-    except KeyError:
-        raise MessageBusError(f"Unknown message bus type: {bus_type}")
-    except Exception as e:
-        raise MessageBusError(f"Failed to create message bus: {str(e)}")
+    def __init__(self):
+        self.topics: Dict[str, Set[str]] = {}
+        self.messages: Dict[str, List[Message]] = {}
+    
+    async def subscribe(self, topic: str, subscriber: str) -> None:
+        """Subscribe to topic"""
+        if not topic or not subscriber:
+            raise MessageBusError("Invalid topic or subscriber")
+            
+        if topic not in self.topics:
+            self.topics[topic] = set()
+            self.messages[topic] = []
+            
+        self.topics[topic].add(subscriber)
+    
+    async def unsubscribe(self, topic: str, subscriber: str) -> None:
+        """Unsubscribe from topic"""
+        if topic in self.topics:
+            self.topics[topic].discard(subscriber)
+    
+    async def publish(self, topic: str, message: Message) -> None:
+        """Publish message to topic"""
+        if not topic or not message:
+            raise MessageBusError("Invalid topic or message")
+            
+        if topic not in self.messages:
+            self.messages[topic] = []
+            
+        self.messages[topic].append(message)
+    
+    async def get_subscribers(self, topic: str) -> List[str]:
+        """Get subscribers for topic"""
+        return list(self.topics.get(topic, set()))
+    
+    async def get_topics(self) -> List[str]:
+        """Get all topics"""
+        return list(self.topics.keys())
+
+# Default message bus instance
+message_bus = InMemoryMessageBus()
 
 __all__ = [
     "BaseMessageBus",
-    "RedisMessageBus",
     "InMemoryMessageBus",
-    "MessageTypes",
-    "MessageBusType",
-    "create_message_bus"
-]
-
-# Version
-__version__ = "1.0.0" 
+    "message_bus"
+] 

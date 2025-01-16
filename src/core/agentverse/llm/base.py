@@ -11,9 +11,7 @@ class LLMResult(BaseModel):
 
     model_config = {
         "arbitrary_types_allowed": True,
-        "json_encoders": {
-            datetime: lambda v: v.isoformat()
-        }
+        "ser_json_timedelta": "iso8601"
     }
 
 class LLMConfig(BaseModel):

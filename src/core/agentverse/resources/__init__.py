@@ -1,251 +1,182 @@
 """
-AgentVerse Resource Management Module
-
-This module provides rate limiting and resource management capabilities.
-It helps control and monitor resource usage across the system.
-
-Key Components:
-    - RateLimiter: Token bucket rate limiting
-    - ResourceManager: Resource allocation and tracking
-    - ResourcePool: Shared resource management
-    - Quotas: Usage quotas and limits
-
-Example Usage:
-    >>> from src.core.agentverse.resources import RateLimiter, ResourceManager
-    >>> 
-    >>> # Configure rate limits
-    >>> llm_limiter = RateLimiter(
-    ...     name="llm_calls",
-    ...     rate=100,  # requests per minute
-    ...     burst=20   # burst capacity
-    ... )
-    >>> 
-    >>> # Use rate limiter
-    >>> async with llm_limiter:
-    ...     response = await llm_service.generate(prompt)
+Resource management module
 """
 
-from typing import Dict, Any, Optional, List, Union
-import asyncio
-import time
 import logging
-from datetime import datetime
+import asyncio
+from typing import Dict, Optional, Any
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-class RateLimitConfig(BaseModel):
-    """Configuration for rate limiting"""
-    rate: float  # Requests per minute
-    burst: int = 1  # Burst capacity
-    window: float = 60.0  # Time window in seconds
-    
 class ResourceQuota(BaseModel):
     """Resource quota configuration"""
-    max_usage: float
-    current_usage: float = 0
-    unit: str = ""
-    reset_interval: Optional[float] = None
-    last_reset: datetime = Field(default_factory=datetime.utcnow)
-
-class RateLimiter:
-    """Token bucket rate limiter"""
     
-    def __init__(
-        self,
-        name: str,
-        rate: float,
-        burst: int = 1,
-        window: float = 60.0
-    ):
-        """Initialize rate limiter
+    current: float = Field(default=0, description="Current resource usage")
+    max: float = Field(default=100, description="Maximum allowed usage")
+    unit: str = Field(default="units", description="Resource unit")
+
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
+                "current": 0,
+                "max": 100,
+                "unit": "MB"
+            }]
+        }
+    }
+
+class RateLimiter(BaseModel):
+    """Rate limiter configuration"""
+    
+    tokens: int = Field(default=60, description="Available tokens")
+    refill_rate: float = Field(default=1.0, description="Tokens per second")
+    max_tokens: int = Field(default=60, description="Maximum token capacity")
+    last_refill: float = Field(default_factory=lambda: asyncio.get_event_loop().time())
+    burst: int = Field(default=1, description="Maximum burst size")
+
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "ser_json_timedelta": "iso8601",
+        "json_schema_extra": {
+            "examples": [{
+                "tokens": 60,
+                "refill_rate": 1.0,
+                "max_tokens": 60,
+                "burst": 1
+            }]
+        }
+    }
+
+    @classmethod
+    def from_rate(cls, rate: float, burst: int = 1) -> "RateLimiter":
+        """Create rate limiter from rate specification
         
         Args:
-            name: Limiter name
-            rate: Requests per minute
-            burst: Burst capacity
-            window: Time window in seconds
-        """
-        self.name = name
-        self.config = RateLimitConfig(
-            rate=rate,
-            burst=burst,
-            window=window
-        )
-        self.tokens = burst
-        self.last_update = time.monotonic()
-        self._lock = asyncio.Lock()
-        logger.debug(f"Initialized rate limiter '{name}'")
-    
-    async def acquire(self) -> bool:
-        """Acquire rate limit token
-        
+            rate: Tokens per second
+            burst: Maximum burst size
+            
         Returns:
-            Whether token was acquired
+            Configured rate limiter
         """
-        async with self._lock:
-            now = time.monotonic()
-            time_passed = now - self.last_update
-            self.last_update = now
+        return cls(
+            tokens=burst,
+            refill_rate=rate,
+            max_tokens=burst,
+            burst=burst
+        )
+
+    async def acquire(self, tokens: int = 1) -> bool:
+        """Acquire tokens from the limiter
+        
+        Args:
+            tokens: Number of tokens to acquire
             
-            # Add new tokens based on time passed
+        Returns:
+            Whether tokens were acquired successfully
+        """
+        # Refill tokens
+        now = asyncio.get_event_loop().time()
+        elapsed = now - self.last_refill
+        new_tokens = int(elapsed * self.refill_rate)
+        
+        if new_tokens > 0:
             self.tokens = min(
-                self.config.burst,
-                self.tokens + time_passed * (self.config.rate / self.config.window)
+                self.tokens + new_tokens,
+                self.max_tokens
             )
-            
-            if self.tokens >= 1:
-                self.tokens -= 1
-                logger.debug(f"Rate limiter '{self.name}': token acquired ({self.tokens} remaining)")
-                return True
-            
-            logger.warning(f"Rate limiter '{self.name}': no tokens available")
+            self.last_refill = now
+        
+        # Check against burst limit
+        if tokens > self.burst:
             return False
-    
-    async def __aenter__(self) -> None:
-        """Async context manager entry"""
-        while not await self.acquire():
-            delay = 1.0 / self.config.rate
-            logger.debug(f"Rate limiter '{self.name}': waiting {delay:.2f}s")
-            await asyncio.sleep(delay)
-    
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        """Async context manager exit"""
-        pass
+        
+        # Check available tokens
+        if self.tokens < tokens:
+            return False
+            
+        self.tokens -= tokens
+        return True
 
 class ResourceManager:
-    """Manages system resources and rate limits"""
+    """Manages system resources and limits"""
     
     def __init__(self):
-        self.rate_limiters: Dict[str, RateLimiter] = {}
         self.quotas: Dict[str, ResourceQuota] = {}
+        self.rate_limiters: Dict[str, RateLimiter] = {}
         logger.info("Initialized ResourceManager")
     
-    def add_rate_limiter(
-        self,
-        name: str,
-        rate: float,
-        burst: int = 1,
-        window: float = 60.0
-    ) -> RateLimiter:
-        """Add rate limiter
-        
-        Args:
-            name: Limiter name
-            rate: Requests per minute
-            burst: Burst capacity
-            window: Time window in seconds
-            
-        Returns:
-            Created rate limiter
-        """
-        limiter = RateLimiter(
-            name=name,
-            rate=rate,
-            burst=burst,
-            window=window
-        )
-        self.rate_limiters[name] = limiter
-        logger.debug(f"Added rate limiter '{name}' (rate={rate}/min, burst={burst})")
-        return limiter
-    
-    def add_quota(
-        self,
-        name: str,
-        max_usage: float,
-        unit: str = "",
-        reset_interval: Optional[float] = None
-    ) -> ResourceQuota:
+    async def add_quota(self, name: str, max_value: float, unit: str = "units") -> None:
         """Add resource quota
         
         Args:
             name: Quota name
-            max_usage: Maximum allowed usage
-            unit: Usage unit
-            reset_interval: Optional reset interval in seconds
-            
-        Returns:
-            Created quota
+            max_value: Maximum allowed value
+            unit: Unit of measurement
         """
-        quota = ResourceQuota(
-            max_usage=max_usage,
-            unit=unit,
-            reset_interval=reset_interval
-        )
-        self.quotas[name] = quota
-        logger.debug(f"Added quota '{name}' (max={max_usage}{unit}, reset={reset_interval}s)")
-        return quota
+        self.quotas[name] = ResourceQuota(max=max_value, unit=unit)
     
-    async def check_quota(self, name: str, usage: float) -> bool:
-        """Check if usage is within quota
-        
-        Args:
-            name: Quota name
-            usage: Requested usage amount
-            
-        Returns:
-            Whether usage is allowed
-        """
+    async def add_rate_limiter(
+        self,
+        name: str,
+        tokens: int = 60,
+        refill_rate: float = 1.0
+    ) -> None:
+        """Add rate limiter"""
+        self.rate_limiters[name] = RateLimiter(
+            tokens=tokens,
+            refill_rate=refill_rate,
+            max_tokens=tokens
+        )
+    
+    async def check_quota(self, name: str, amount: float) -> bool:
+        """Check if quota allows operation"""
         if name not in self.quotas:
-            logger.warning(f"No quota defined for '{name}'")
             return True
             
         quota = self.quotas[name]
-        
-        # Check reset interval
-        if quota.reset_interval:
-            now = datetime.utcnow()
-            if (now - quota.last_reset).total_seconds() >= quota.reset_interval:
-                logger.info(f"Resetting quota '{name}' (interval elapsed)")
-                quota.current_usage = 0
-                quota.last_reset = now
-        
-        # Check usage
-        if quota.current_usage + usage > quota.max_usage:
+        if quota.current + amount > quota.max:
             logger.warning(
-                f"Quota exceeded for '{name}': "
-                f"current={quota.current_usage}, "
-                f"requested={usage}, "
-                f"max={quota.max_usage}"
+                f"Quota exceeded for '{name}': current={quota.current}, "
+                f"requested={amount}, max={quota.max}"
             )
             return False
             
-        quota.current_usage += usage
-        logger.debug(
-            f"Updated quota '{name}': "
-            f"current={quota.current_usage}, "
-            f"remaining={quota.max_usage - quota.current_usage}"
-        )
         return True
     
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get resource metrics
+    async def consume_quota(self, name: str, amount: float) -> None:
+        """Consume quota amount"""
+        if name in self.quotas:
+            self.quotas[name].current += amount
+    
+    async def check_rate_limit(self, name: str, tokens: int = 1) -> bool:
+        """Check if rate limit allows operation"""
+        if name not in self.rate_limiters:
+            return True
+            
+        limiter = self.rate_limiters[name]
         
-        Returns:
-            Resource usage metrics
-        """
-        return {
-            "rate_limits": {
-                name: {
-                    "rate": limiter.config.rate,
-                    "burst": limiter.config.burst,
-                    "tokens": limiter.tokens
-                }
-                for name, limiter in self.rate_limiters.items()
-            },
-            "quotas": {
-                name: {
-                    "max": quota.max_usage,
-                    "current": quota.current_usage,
-                    "unit": quota.unit
-                }
-                for name, quota in self.quotas.items()
-            }
-        }
+        # Refill tokens
+        now = asyncio.get_event_loop().time()
+        elapsed = now - limiter.last_refill
+        new_tokens = int(elapsed * limiter.refill_rate)
+        
+        if new_tokens > 0:
+            limiter.tokens = min(
+                limiter.tokens + new_tokens,
+                limiter.max_tokens
+            )
+            limiter.last_refill = now
+        
+        if limiter.tokens < tokens:
+            logger.warning(f"Rate limiter '{name}': no tokens available")
+            return False
+            
+        limiter.tokens -= tokens
+        return True
 
 __all__ = [
-    "RateLimiter",
     "ResourceManager",
-    "RateLimitConfig",
-    "ResourceQuota"
+    "ResourceQuota",
+    "RateLimiter"
 ] 

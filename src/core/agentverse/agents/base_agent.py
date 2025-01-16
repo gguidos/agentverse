@@ -1,22 +1,22 @@
 """
-Base agent class for AgentVerse
+Base agent interface
 """
 
-from typing import Any, Dict, List, Optional
 from abc import ABC, abstractmethod
+from typing import Any, Dict, List, Optional
 
-from src.core.agentverse.message import Message, MessageType, MessageRole
-from src.core.agentverse.services.llm.base import BaseLLMService
-from src.core.agentverse.memory.base import BaseMemory
-from src.core.agentverse.exceptions import AgentError, AgentStateError
+from src.core.agentverse.message import Message
+from src.core.agentverse.llm import BaseLLM
+from src.core.agentverse.memory import BaseMemory
+from src.core.agentverse.exceptions import AgentError
 
 class BaseAgent(ABC):
-    """Abstract base class for all agents"""
+    """Abstract base class for agents"""
     
     def __init__(
         self,
         name: str,
-        llm_service: BaseLLMService,
+        llm_service: Optional[BaseLLM] = None,
         memory: Optional[BaseMemory] = None,
         **kwargs
     ):
@@ -24,29 +24,18 @@ class BaseAgent(ABC):
         
         Args:
             name: Agent name
-            llm_service: LLM service instance
-            memory: Optional memory instance
-            **kwargs: Additional agent arguments
+            llm_service: Optional LLM service
+            memory: Optional memory implementation
+            **kwargs: Additional arguments
         """
         self.name = name
-        self.llm_service = llm_service
+        self.llm = llm_service
         self.memory = memory
-        self.state: Dict[str, Any] = {}
         self.message_history: List[Message] = []
     
     @abstractmethod
     async def process_message(self, message: Message) -> Message:
-        """Process incoming message
-        
-        Args:
-            message: Input message
-            
-        Returns:
-            Response message
-            
-        Raises:
-            AgentError: If processing fails
-        """
+        """Process incoming message"""
         pass
     
     async def send_message(self, content: str, **kwargs) -> Message:

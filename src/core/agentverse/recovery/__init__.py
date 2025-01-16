@@ -1,112 +1,97 @@
 """
-AgentVerse Recovery Module
-
-This module provides error handling and recovery mechanisms for the AgentVerse system.
-It includes retry logic, circuit breakers, fallback strategies, and state recovery.
-
-Key Components:
-    - RetryHandler: Configurable retry logic with backoff
-    - StateRecovery: Save and restore system state
-    - ErrorRegistry: Central error tracking and handling
-
-Example Usage:
-    >>> from src.core.agentverse.recovery import RetryHandler
-    >>> from src.core.infrastructure.circuit_breaker import circuit_breaker
-    >>> 
-    >>> # Configure retry logic
-    >>> retry = RetryHandler(max_retries=3, backoff_factor=1.5)
-    >>> 
-    >>> @retry.wrap
-    >>> @circuit_breaker
-    >>> async def call_llm(prompt: str) -> str:
-    ...     return await llm_service.generate(prompt)
+Recovery mechanisms
 """
 
-from typing import TypeVar, Callable, Any, Optional, Dict, List
-import asyncio
 import logging
-import time
-from datetime import datetime
+import asyncio
 from functools import wraps
+from typing import Any, Callable, Optional, Type, Tuple
 from pydantic import BaseModel, Field
-
-from src.core.infrastructure.circuit_breaker import circuit_breaker
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
-
 class RetryConfig(BaseModel):
-    """Configuration for retry behavior"""
-    max_retries: int = 3
-    backoff_factor: float = 1.5
-    max_delay: float = 60.0
-    retry_exceptions: List[type] = Field(default_factory=lambda: [Exception])
+    """Configuration for retry handling"""
+    
+    max_attempts: int = Field(default=3, description="Maximum retry attempts")
+    delay_seconds: float = Field(default=1.0, description="Initial delay between retries")
+    backoff_factor: float = Field(default=2.0, description="Exponential backoff multiplier")
+    exceptions: Tuple[Type[Exception], ...] = Field(
+        default=(Exception,),
+        description="Exceptions to catch and retry"
+    )
 
-class RecoveryState(BaseModel):
-    """State tracking for recovery mechanisms"""
-    retry_counts: Dict[str, int] = Field(default_factory=dict)
-    last_failures: Dict[str, datetime] = Field(default_factory=dict)
-    error_counts: Dict[str, int] = Field(default_factory=dict)
+    model_config = {
+        "json_schema_extra": {
+            "examples": [{
+                "max_attempts": 3,
+                "delay_seconds": 1.0,
+                "backoff_factor": 2.0,
+                "exceptions": ["Exception"]
+            }]
+        }
+    }
 
 class RetryHandler:
-    """Handles retry logic with exponential backoff"""
+    """Handles retry logic for operations"""
     
     def __init__(self, config: Optional[RetryConfig] = None):
         self.config = config or RetryConfig()
-        self.state = RecoveryState()
     
-    def wrap(self, func: Callable[..., T]) -> Callable[..., T]:
-        """Wrap function with retry logic"""
-        
+    def handle(self, func: Callable) -> Callable:
+        """Decorator for retry handling"""
         @wraps(func)
-        async def wrapper(*args, **kwargs) -> T:
-            operation_id = f"{func.__module__}.{func.__name__}"
-            retry_count = 0
+        async def wrapper(*args, **kwargs):
+            attempts = 0
+            last_error = None
+            delay = self.config.delay_seconds
             
-            while True:
+            while attempts < self.config.max_attempts:
                 try:
-                    result = await func(*args, **kwargs)
-                    # Reset retry count on success
-                    self.state.retry_counts[operation_id] = 0
-                    return result
-                    
-                except tuple(self.config.retry_exceptions) as e:
-                    retry_count += 1
-                    self.state.retry_counts[operation_id] = retry_count
-                    
-                    if retry_count >= self.config.max_retries:
-                        logger.error(
-                            f"Max retries ({self.config.max_retries}) exceeded for {operation_id}"
-                        )
-                        raise
-                    
-                    delay = min(
-                        self.config.backoff_factor ** (retry_count - 1),
-                        self.config.max_delay
-                    )
-                    
+                    return await func(*args, **kwargs)
+                except self.config.exceptions as e:
+                    attempts += 1
+                    last_error = e
                     logger.warning(
-                        f"Retry {retry_count}/{self.config.max_retries} "
-                        f"for {operation_id} after {delay}s: {str(e)}"
+                        f"Attempt {attempts} failed: {str(e)}"
                     )
-                    
-                    await asyncio.sleep(delay)
-                    
-                except Exception as e:
-                    # Don't retry unhandled exceptions
-                    logger.error(f"Unhandled error in {operation_id}: {str(e)}")
-                    raise
-                    
+                    if attempts < self.config.max_attempts:
+                        await asyncio.sleep(delay)
+                        delay *= self.config.backoff_factor
+            
+            raise last_error
+            
         return wrapper
 
-class RecoveryError(Exception):
-    """Base class for recovery errors"""
-    pass
+def circuit_breaker(func: Optional[Callable] = None, *, max_failures: int = 3) -> Callable:
+    """Circuit breaker decorator"""
+    def decorator(func: Callable) -> Callable:
+        failures = 0
+        
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            nonlocal failures
+            
+            if failures >= max_failures:
+                logger.error("Circuit open - too many failures")
+                raise RuntimeError("Circuit breaker open")
+                
+            try:
+                result = await func(*args, **kwargs)
+                failures = 0  # Reset on success
+                return result
+            except Exception as e:
+                failures += 1
+                raise
+                
+        return wrapper
+        
+    if func is None:
+        return decorator
+    return decorator(func)
 
 __all__ = [
-    "RetryHandler",
     "RetryConfig",
-    "RecoveryState",
-    "RecoveryError"
+    "RetryHandler",
+    "circuit_breaker"
 ] 

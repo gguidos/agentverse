@@ -93,13 +93,17 @@ class ChatResponse(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        json_encoders={
-            datetime: lambda dt: dt.isoformat(),
-            ToolUsage: lambda t: t.model_dump()
+    model_config = {
+        "arbitrary_types_allowed": True,
+        "ser_json_timedelta": "iso8601",
+        "json_schema_extra": {
+            "examples": [{
+                "response": "Hello!",
+                "task_id": "task_123",
+                "timestamp": "2024-01-16T12:00:00Z"
+            }]
         }
-    )
+    }
     
     @classmethod
     def from_message(
