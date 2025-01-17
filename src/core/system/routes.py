@@ -4,6 +4,7 @@ from src.core.interfaces.api.v1.agents_controller import router as agents_router
 from src.core.interfaces.api.v1.simulation_controller import router as simulation_router
 from src.core.infrastructure.metrics import metrics_router
 from src.core.interfaces.api.v1.tools_controller import router as tools_router
+from src.core.interfaces.api.v1.environments_controller import router as environments_router
 
 def register_routers(app, container):
     # Wire the container to the modules that use the dependencies
@@ -20,3 +21,4 @@ def register_routers(app, container):
     app.include_router(simulation_router, prefix="/api/v1", tags=["simulation"])
     app.include_router(metrics_router, prefix="/internal", tags=["monitoring"])
     app.include_router(tools_router, prefix="/api/v1", tags=["tools"])
+    app.include_router(environments_router, prefix="/api/v1", tags=["environments"])

@@ -25,6 +25,8 @@ from src.core.agentverse.capabilities import register_default_tools
 from src.core.agentverse.memory.vectorstore import VectorstoreService
 from src.core.agentverse.memory.agent_memory import AgentMemoryStore
 from src.core.services.tool_service import ToolService
+from src.core.services.environment_service import EnvironmentService
+from src.core.repositories.environment_repository import EnvironmentRepository
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
@@ -191,6 +193,16 @@ class Container(containers.DeclarativeContainer):
         tool_registry=tool_registry
     )
 
+    environment_repository = providers.Factory(
+        EnvironmentRepository,
+        mongo_client=mongo_client
+    )
+
+    environment_service = providers.Factory(
+        EnvironmentService,
+        environment_repository=environment_repository
+    )
+
 async def get_llm_service() -> Any:
     """Get LLM service instance"""
     container = Container()
@@ -214,4 +226,9 @@ async def get_tool_service() -> ToolService:
     """Get tool service instance"""
     container = Container()
     return container.tool_service()
+
+async def get_environment_service() -> EnvironmentService:
+    """Get environment service instance"""
+    container = Container()
+    return container.environment_service()
 
