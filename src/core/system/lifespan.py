@@ -36,8 +36,6 @@ async def lifespan(app):
                 logger.warning(f"Redis connection attempt {retry_count} failed, retrying...")
                 await asyncio.sleep(2)  # Wait 2 seconds before retrying
 
-        assert mongo_client.collection is not None, "MongoDB collection is not set during startup"
-
         await FastAPILimiter.init(redis_client)
         logger.info("Rate limiter initialized with Redis backend.")
 

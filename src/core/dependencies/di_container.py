@@ -31,8 +31,7 @@ class Container(containers.DeclarativeContainer):
     mongo_client = providers.Singleton(
         MongoDBClient,
         db_uri=config.db_uri,
-        db_name=config.db_name,
-        db_collection=config.db_collection
+        db_name=config.db_name
     )
 
     # Redis Client (Singleton using the new RedisClient class)
