@@ -19,6 +19,7 @@ from typing import Optional, Any
 from fastapi import Depends
 from src.core.agentverse.llm import get_llm
 from src.core.repositories.agent_repository import AgentRepository
+from src.core.services.agent_service import AgentService
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
@@ -146,6 +147,11 @@ class Container(containers.DeclarativeContainer):
         mongo_client=mongo_client
     )
 
+    agent_service = providers.Factory(
+        AgentService,
+        agent_repository=agent_repository
+    )
+
 async def get_llm_service() -> Any:
     """Get LLM service instance"""
     container = Container()
@@ -159,4 +165,9 @@ async def get_agent_repository() -> AgentRepository:
     """Get agent repository instance"""
     container = Container()
     return container.agent_repository()
+
+async def get_agent_service() -> AgentService:
+    """Get agent service instance"""
+    container = Container()
+    return container.agent_service()
 

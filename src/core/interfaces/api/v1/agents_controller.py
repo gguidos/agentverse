@@ -7,10 +7,11 @@ from datetime import datetime
 
 from src.core.agentverse.factories import AgentFactory
 from src.core.agentverse.factories.agent import AgentFactoryConfig
-from src.core.dependencies.di_container import get_llm_service, get_agent_repository
+from src.core.dependencies.di_container import get_llm_service, get_agent_repository, get_agent_service
 from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
 from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
 from src.core.repositories.agent_repository import AgentRepository
+from src.core.services.agent_service import AgentService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -27,11 +28,10 @@ class CreateAgentRequest(BaseModel):
 async def create_agents(
     request: CreateAgentRequest,
     llm_service = Depends(get_llm_service),
-    agent_repository: AgentRepository = Depends(get_agent_repository)
+    agent_service: AgentService = Depends(get_agent_service)
 ):
     """Create a new agent"""
     try:
-        # Create agent config with generated ID
         config = AgentFactoryConfig(
             id=str(uuid.uuid4()),
             type=request.type,
@@ -40,25 +40,9 @@ async def create_agents(
             llm=request.llm_config,
             metadata=request.metadata
         )
-
-        # Create agent using factory
-        agent = await AgentFactory.create(
-            config=config,
-            llm_service=llm_service
-        )
-
-        # Store agent in database
-        agent_data = {
-            "id": agent.config.id,
-            "name": agent.config.name,
-            "type": agent.config.type,
-            "capabilities": agent.config.capabilities,
-            "metadata": agent.config.metadata,
-            "created_at": datetime.utcnow()
-        }
-        await agent_repository.create(agent_data)
-
-        # Return agent data
+        
+        agent = await agent_service.create_agent(config, llm_service)
+        
         return {
             "status": "success",
             "data": {
@@ -68,7 +52,6 @@ async def create_agents(
                 "capabilities": agent.config.capabilities
             }
         }
-
     except ValueError as e:
         logger.error(f"Invalid agent configuration: {str(e)}")
         raise HTTPException(
@@ -91,3 +74,23 @@ async def create_vector_store(
     logger.info("Creating vector store")
     result = await orchestrator.process_file(file, store_name)
     return result
+
+@router.get("/agents")
+async def list_agents(
+    agent_service: AgentService = Depends(get_agent_service)
+):
+    """List all agents"""
+    try:
+        agents = await agent_service.list_agents()
+        return {
+            "status": "success",
+            "data": {
+                "agents": agents
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error listing agents: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing agents: {str(e)}"
+        )
