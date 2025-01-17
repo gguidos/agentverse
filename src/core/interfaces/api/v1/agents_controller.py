@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from pydantic import BaseModel
 import logging
@@ -23,6 +23,11 @@ class CreateAgentRequest(BaseModel):
     capabilities: list = []
     llm_config: Dict[str, Any] = {"type": "mock"}
     metadata: Dict[str, Any] = {}
+
+class UpdateAgentRequest(BaseModel):
+    """Request model for agent update"""
+    capabilities: Optional[List[str]] = None
+    metadata: Optional[Dict[str, Any]] = None
 
 @router.post("/agents")
 async def create_agents(
@@ -93,4 +98,34 @@ async def list_agents(
         raise HTTPException(
             status_code=500,
             detail=f"Error listing agents: {str(e)}"
+        )
+
+@router.patch("/agents")
+async def update_agent(
+    request: UpdateAgentRequest,
+    name: str,
+    type: str = "assistant",
+    agent_service: AgentService = Depends(get_agent_service)
+):
+    """Update an agent by name and type"""
+    try:
+        agent = await agent_service.update_agent_by_name_type(
+            name, 
+            type, 
+            request.model_dump(exclude_unset=True)
+        )
+        return {
+            "status": "success",
+            "data": agent
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=404,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"Error updating agent: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating agent: {str(e)}"
         )

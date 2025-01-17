@@ -42,3 +42,43 @@ class AgentService:
     async def list_agents(self) -> List[Dict[str, Any]]:
         """Get all agents"""
         return await self.repository.list_agents() 
+        
+    async def update_agent(self, agent_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update agent capabilities"""
+        # Get existing agent
+        agent = await self.repository.get(agent_id)
+        if not agent:
+            raise ValueError(f"Agent with id '{agent_id}' not found")
+        
+        # Update agent data
+        updated = await self.repository.update(
+            agent_id,
+            {
+                **update_data,
+                "updated_at": datetime.utcnow()
+            }
+        )
+        return updated 
+        
+    async def update_agent_by_name_type(
+        self, 
+        name: str, 
+        type: str, 
+        update_data: Dict[str, Any]
+    ) -> Optional[Dict[str, Any]]:
+        """Update agent by name and type"""
+        # Get existing agent
+        agent = await self.repository.find_by_name_and_type(name, type)
+        if not agent:
+            raise ValueError(f"Agent with name '{name}' and type '{type}' not found")
+        
+        # Update agent data
+        updated = await self.repository.update_by_name_type(
+            name,
+            type,
+            {
+                **update_data,
+                "updated_at": datetime.utcnow()
+            }
+        )
+        return updated 
