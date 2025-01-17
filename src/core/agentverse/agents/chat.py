@@ -1,10 +1,11 @@
 from typing import Dict, Any, Optional, List
 import logging
 
-from src.core.agentverse.agents.base_agent import BaseAgent, AgentConfig
+from src.core.agentverse.agents import BaseAgent, AgentConfig
 from src.core.agentverse.agents.mixins.message_handler import MessageHandlerMixin
+from src.core.agentverse.message_bus import BaseMessageBus
 from src.core.agentverse.agents.mixins.memory_handler import MemoryHandlerMixin
-from src.core.agentverse.message import ChatMessage, CommandMessage
+from src.core.agentverse.message import Message, MessageType
 from src.core.agentverse.memory import BaseMemory
 
 logger = logging.getLogger(__name__)
@@ -30,10 +31,10 @@ class ChatAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
         MemoryHandlerMixin.__init__(self, memory)
         
         # Register handlers
-        self.register_handler("chat", self.handle_chat)
-        self.register_handler("command", self.handle_command)
+        self.register_handler(MessageType.CHAT, self.handle_chat)
+        self.register_handler(MessageType.COMMAND, self.handle_command)
     
-    async def handle_chat(self, message: ChatMessage) -> None:
+    async def handle_chat(self, message: Message) -> None:
         """Handle chat message
         
         Args:
@@ -46,7 +47,7 @@ class ChatAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
             # Get conversation context
             context = await self.get_context(
                 filter_dict={
-                    "conversation_id": message.metadata.conversation_id
+                    "conversation_id": message.metadata.get("conversation_id")
                 }
             )
             
@@ -57,10 +58,13 @@ class ChatAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
             )
             
             # Create response message
-            response_msg = ChatMessage.assistant(
+            response_msg = Message(
                 content=response,
+                type=MessageType.CHAT,
+                sender=self.name,
+                receiver={"all"},
                 metadata={
-                    "conversation_id": message.metadata.conversation_id,
+                    "conversation_id": message.metadata.get("conversation_id"),
                     "parent_id": message.id
                 }
             )
@@ -74,21 +78,21 @@ class ChatAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
         except Exception as e:
             logger.error(f"Chat handling failed: {str(e)}")
     
-    async def handle_command(self, message: CommandMessage) -> None:
+    async def handle_command(self, message: Message) -> None:
         """Handle command message
         
         Args:
             message: Command message
         """
         # Process command
-        if message.action == "clear":
+        if message.content == "clear":
             await self.clear_context()
-        elif message.action == "reset":
+        elif message.content == "reset":
             await self.reset()
     
     async def generate_response(
         self,
-        message: ChatMessage,
+        message: Message,
         context: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """Generate response to chat message

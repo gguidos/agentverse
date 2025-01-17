@@ -1,52 +1,26 @@
-"""
-Memory Manipulators Module
-
-This module provides data manipulation for memory operations:
-
-1. Vector Manipulator:
-   - Embedding generation
-   - Vector normalization
-   - Dimension reduction
-
-2. Document Manipulator:
-   - Text processing
-   - Metadata extraction
-   - Format conversion
-"""
+"""Memory manipulators module"""
 
 from typing import Dict, Type
 
-from src.core.agentverse.memory.manipulators.base import BaseManipulator
-from src.core.agentverse.memory.manipulators.vector import VectorManipulator
-from src.core.agentverse.memory.manipulators.document import DocumentManipulator
+from src.core.agentverse.memory.manipulators.base import BaseMemoryManipulator
+from src.core.agentverse.memory.manipulators.simple import SimpleMemoryManipulator
+from src.core.agentverse.memory.manipulators.summarize import SummarizeMemoryManipulator
+from src.core.agentverse.memory.manipulators.filter import FilterMemoryManipulator
 
-# Manipulator registry
-MANIPULATORS: Dict[str, Type[BaseManipulator]] = {
-    "vector": VectorManipulator,
-    "document": DocumentManipulator
+# Registry of manipulator implementations
+manipulator_registry: Dict[str, Type[BaseMemoryManipulator]] = {
+    "simple": SimpleMemoryManipulator,
+    "summarize": SummarizeMemoryManipulator,
+    "filter": FilterMemoryManipulator,
+    "default": SimpleMemoryManipulator
 }
 
-def get_manipulator(name: str) -> Type[BaseManipulator]:
-    """Get manipulator by name
-    
-    Args:
-        name: Manipulator name
-        
-    Returns:
-        Manipulator class
-        
-    Raises:
-        ValueError: If manipulator not found
-    """
-    if name not in MANIPULATORS:
-        raise ValueError(f"Manipulator not found: {name}")
-    return MANIPULATORS[name]
-
 __all__ = [
-    'BaseManipulator',
-    'VectorManipulator',
-    'DocumentManipulator',
-    'get_manipulator'
+    "BaseMemoryManipulator",
+    "SimpleMemoryManipulator",
+    "SummarizeMemoryManipulator", 
+    "FilterMemoryManipulator",
+    "manipulator_registry"
 ]
 
 # Version

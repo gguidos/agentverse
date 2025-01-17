@@ -2,11 +2,11 @@
 Agent configuration module
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Dict, Any, Optional, List
 from pydantic import BaseModel, Field
 
 class AgentConfig(BaseModel):
-    """Agent configuration"""
+    """Base configuration for agents"""
     name: str
     description: Optional[str] = None
     llm_config: Dict[str, Any] = Field(default_factory=dict)

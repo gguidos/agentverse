@@ -1,18 +1,19 @@
+"""Evaluator agent implementation"""
+
 from typing import Dict, Any, Optional, List, Union
 import logging
 import asyncio
+from pydantic import BaseModel, Field
 
-from src.core.agentverse.agents.base_agent import BaseAgent, AgentConfig
+from src.core.agentverse.agents.base_agent import BaseAgent
+from src.core.agentverse.agents.config import AgentConfig
 from src.core.agentverse.agents.mixins.message_handler import MessageHandlerMixin
 from src.core.agentverse.agents.mixins.memory_handler import MemoryHandlerMixin
-from src.core.agentverse.message import (
-    BaseMessage,
-    ChatMessage,
-    CommandMessage,
-    EventMessage
-)
+from src.core.agentverse.message import Message, MessageType
 from src.core.agentverse.memory import BaseMemory
 from src.core.agentverse.services.llm import BaseLLMService
+from src.core.agentverse.message_bus import BaseMessageBus
+from src.core.agentverse.registry import agent_registry
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +54,8 @@ class EvaluatorConfig(AgentConfig):
     distributed: bool = False
     llm_config: Dict[str, Any] = Field(default_factory=dict)
 
-class Evaluator(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
+@agent_registry.register("evaluator")
+class EvaluatorAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
     """Enhanced evaluator agent"""
     
     def __init__(
@@ -71,47 +73,75 @@ class Evaluator(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
             memory: Optional memory backend
             llm: Optional LLM service
         """
-        BaseAgent.__init__(self, config, message_bus, memory)
+        BaseAgent.__init__(self, name=config.name, llm=llm)
         MessageHandlerMixin.__init__(self)
         MemoryHandlerMixin.__init__(self, memory)
         
+        self.config = config
+        self.message_bus = message_bus
+        
         # Register handlers
-        self.register_handler("chat", self.handle_chat)
-        self.register_handler("command", self.handle_command)
-        self.register_handler("event", self.handle_event)
-        
-        # Evaluation queue
-        self._eval_queue: List[Dict[str, Any]] = []
-        
-        self.llm = llm
-        
-    async def handle_chat(self, message: ChatMessage) -> None:
+        self.register_handler(MessageType.CHAT, self.handle_chat)
+        self.register_handler(MessageType.COMMAND, self.handle_command)
+        self.register_handler(MessageType.EVENT, self.handle_event)
+    
+    async def handle_chat(self, message: Message) -> None:
         """Handle chat message
         
         Args:
             message: Chat message to evaluate
         """
-        # Add to evaluation queue
-        self._eval_queue.append(message.dict())
-        
-        # Store message
-        await self.remember(message)
-        
-        # Trigger evaluation if queue is full
-        if len(self._eval_queue) >= self.config.batch_size:
-            await self.evaluate_batch()
+        try:
+            # Store message
+            await self.remember(message)
+            
+            # Get context
+            context = await self.get_context(
+                filter_dict={
+                    "conversation_id": message.metadata.get("conversation_id")
+                }
+            )
+            
+            # Evaluate message
+            evaluation = await self._evaluate_message(message, context)
+            
+            # Create response
+            response = Message(
+                content=evaluation.feedback,
+                type=MessageType.CHAT,
+                sender=self.name,
+                receiver={"all"},
+                metadata={
+                    "conversation_id": message.metadata.get("conversation_id"),
+                    "parent_id": message.id,
+                    "metrics": evaluation.metrics.dict(),
+                    "evaluation_id": evaluation.id
+                }
+            )
+            
+            # Store and send response
+            await self.remember(response)
+            await self.send_message(response)
+            
+        except Exception as e:
+            logger.error(f"Chat handling failed: {str(e)}")
     
-    async def handle_event(self, message: EventMessage) -> None:
+    async def handle_event(self, message: Message) -> None:
         """Handle evaluation events
         
         Args:
             message: Event message
         """
-        if message.event_type == "evaluation_requested":
-            await self.evaluate_agent(message.data["agent_id"])
+        if message.type != MessageType.EVENT:
+            return
             
-        elif message.event_type == "metrics_updated":
-            await self.update_metrics(message.data)
+        event_type = message.metadata.get("event_type")
+        
+        if event_type == "evaluation_requested":
+            await self.evaluate_agent(message.metadata.get("agent_id"))
+            
+        elif event_type == "metrics_updated":
+            await self.update_metrics(message.metadata.get("data"))
     
     async def evaluate_batch(self) -> None:
         """Evaluate batch of messages"""

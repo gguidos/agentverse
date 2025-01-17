@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional, List, Union
 import logging
 
 from src.core.agentverse.memory import BaseMemory
-from src.core.agentverse.message import ChatMessage, BaseMessage
+from src.core.agentverse.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +20,7 @@ class MemoryHandlerMixin:
     
     async def remember(
         self,
-        message: Union[BaseMessage, Dict[str, Any]],
+        message: Union[Message, Dict[str, Any]],
         **kwargs
     ) -> None:
         """Store message in memory
@@ -34,7 +34,7 @@ class MemoryHandlerMixin:
             
         try:
             # Convert message to dict if needed
-            if isinstance(message, BaseMessage):
+            if isinstance(message, Message):
                 message = message.dict()
             
             # Store in memory

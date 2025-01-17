@@ -1,7 +1,7 @@
 from typing import Dict, Any, Optional, List, Callable
 import logging
 
-from src.core.agentverse.message import BaseMessage
+from src.core.agentverse.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class MessageHandlerMixin:
     
     async def dispatch_message(
         self,
-        message: BaseMessage
+        message: Message
     ) -> None:
         """Dispatch message to handlers
         
