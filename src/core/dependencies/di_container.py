@@ -20,6 +20,11 @@ from fastapi import Depends
 from src.core.agentverse.llm import get_llm
 from src.core.repositories.agent_repository import AgentRepository
 from src.core.services.agent_service import AgentService
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.capabilities import register_default_tools
+from src.core.agentverse.memory.vectorstore import VectorstoreService
+from src.core.agentverse.memory.agent_memory import AgentMemoryStore
+from src.core.services.tool_service import ToolService
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
@@ -147,9 +152,43 @@ class Container(containers.DeclarativeContainer):
         mongo_client=mongo_client
     )
 
+    # LLM Service
+    llm_service = providers.Factory(
+        get_llm,
+        llm_type=config.llm.type,
+        model=config.llm.model,
+        temperature=config.llm.temperature,
+        max_tokens=config.llm.max_tokens
+    )
+
+    # Vector store dependencies
+    vectorstore_service = providers.Factory(
+        VectorstoreService,
+        embedding_service=embedding_service,
+        chroma_db=chroma_db_client
+    )
+
+    # Memory store dependencies
+    memory_store = providers.Factory(
+        AgentMemoryStore,
+        redis_client=redis_client,
+        vectorstore=vectorstore_service
+    )
+
+    # Tool registry with only required dependencies for simple tools
+    tool_registry = providers.Singleton(
+        register_default_tools
+    )
+
     agent_service = providers.Factory(
         AgentService,
-        agent_repository=agent_repository
+        agent_repository=agent_repository,
+        tool_registry=tool_registry
+    )
+
+    tool_service = providers.Factory(
+        ToolService,
+        tool_registry=tool_registry
     )
 
 async def get_llm_service() -> Any:
@@ -170,4 +209,9 @@ async def get_agent_service() -> AgentService:
     """Get agent service instance"""
     container = Container()
     return container.agent_service()
+
+async def get_tool_service() -> ToolService:
+    """Get tool service instance"""
+    container = Container()
+    return container.tool_service()
 

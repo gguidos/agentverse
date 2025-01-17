@@ -1,107 +1,94 @@
-"""AgentVerse exceptions module"""
+"""AgentVerse exceptions"""
+
+from typing import Optional, Dict, Any
 
 class AgentVerseError(Exception):
-    """Base exception for AgentVerse"""
-    pass
+    """Base exception for AgentVerse errors"""
+    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
+        super().__init__(message)
+        self.message = message
+        self.details = details or {}
 
 class ConfigError(AgentVerseError):
     """Configuration error"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
-
-class RegistrationError(AgentVerseError):
-    """Raised when registration fails"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
-
-class ComponentNotFoundError(AgentVerseError):
-    """Raised when a component is not found"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
-
-class ParserError(AgentVerseError):
-    """Raised when parsing fails"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    pass
 
 class LLMError(AgentVerseError):
-    """Raised when LLM operations fail"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    """LLM operation error"""
+    pass
 
-class SimulationError(AgentVerseError):
-    """Raised when simulation fails"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+class RegistrationError(AgentVerseError):
+    """Registration error"""
+    pass
 
-class MemoryManipulationError(AgentVerseError):
-    """Raised when memory manipulation fails"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+class ComponentNotFoundError(AgentVerseError):
+    """Component not found error"""
+    pass
 
-class AgentError(AgentVerseError):
-    """Raised when agent operations fail"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+class ParserError(AgentVerseError):
+    """Parser error"""
+    pass
 
 class ActionError(AgentVerseError):
-    """Raised when action execution fails"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    """Action execution error"""
+    pass
 
 class AgentStateError(AgentVerseError):
-    """Raised when agent state operations fail"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    """Agent state error"""
+    pass
+
+class SimulationError(AgentVerseError):
+    """Simulation execution error"""
+    pass
 
 class EnvironmentError(AgentVerseError):
     """Environment error"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    pass
+
+class ToolError(AgentVerseError):
+    """Exception raised by tools during execution"""
+    pass
+
+class MessageBusError(AgentVerseError):
+    """Exception raised by message bus operations"""
+    pass
+
+class AgentError(AgentVerseError):
+    """Exception raised by agent operations"""
+    pass
+
+class FactoryError(AgentVerseError):
+    """Exception raised during object creation"""
+    pass
 
 class MemoryError(AgentVerseError):
     """Memory operation error"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    pass
 
 class MemoryStorageError(AgentVerseError):
     """Memory storage error"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+    pass
 
-class MessageBusError(AgentVerseError):
-    """Message bus error"""
-    def __init__(self, message: str, details: dict = None):
-        super().__init__(message)
-        self.details = details or {}
+class MemoryManipulationError(AgentVerseError):
+    """Memory manipulation error"""
+    pass
 
 __all__ = [
     "AgentVerseError",
     "ConfigError",
+    "LLMError",
     "RegistrationError",
     "ComponentNotFoundError",
     "ParserError",
-    "LLMError",
-    "SimulationError",
-    "MemoryManipulationError",
-    "AgentError",
     "ActionError",
     "AgentStateError",
+    "SimulationError",
     "EnvironmentError",
+    "ToolError",
+    "MessageBusError",
+    "AgentError",
+    "FactoryError",
     "MemoryError",
     "MemoryStorageError",
-    "MessageBusError"
+    "MemoryManipulationError"
 ] 

@@ -19,7 +19,12 @@ logger = logging.getLogger(__name__)
 app = FastAPI(
     title="API User Microservice",
     description="A service for routing and managing user API requests",
-    version="1.0.0"
+    version="1.0.0",
+    openapi_url="/openapi.json",
+    docs_url="/docs",
+    redoc_url="/redoc",
+    swagger_ui_parameters={"tryItOutEnabled": True},
+    include_in_schema=True
 )
 
 # Set logging level for pika to WARNING to suppress DEBUG and INFO logs

@@ -81,23 +81,26 @@ async def create_vector_store(
     return result
 
 @router.get("/agents")
+@router.get("/agents/")
 async def list_agents(
     agent_service: AgentService = Depends(get_agent_service)
 ):
     """List all agents"""
     try:
-        agents = await agent_service.list_agents()
+        logger.debug("Requesting agents list from service")
+        result = await agent_service.list_agents()
+        
         return {
             "status": "success",
-            "data": {
-                "agents": agents
-            }
+            "data": result,
+            "message": "Agents retrieved successfully",
+            "error": None
         }
     except Exception as e:
-        logger.error(f"Error listing agents: {str(e)}")
+        logger.error(f"Error listing agents: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Error listing agents: {str(e)}"
+            detail=str(e)
         )
 
 @router.patch("/agents")
@@ -128,4 +131,24 @@ async def update_agent(
         raise HTTPException(
             status_code=500,
             detail=f"Error updating agent: {str(e)}"
+        )
+
+@router.get("/tools")
+async def list_tools(
+    agent_service: AgentService = Depends(get_agent_service)
+):
+    """List all available tools"""
+    try:
+        tools = await agent_service.list_tools()
+        return {
+            "status": "success",
+            "data": {
+                "tools": tools
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error listing tools: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error listing tools: {str(e)}"
         )

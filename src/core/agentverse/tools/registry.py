@@ -1,7 +1,8 @@
 from typing import Dict, Type, Any, Optional, List
 from pydantic import BaseModel, Field
 import logging
-from src.core.agentverse.tools.base import BaseTool, ToolConfig
+from .base import BaseTool, ToolConfig
+from .types import SIMPLE_TOOLS, COMPLEX_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -10,6 +11,7 @@ class ToolRegistryConfig(BaseModel):
     allow_duplicates: bool = False
     validate_schemas: bool = True
     auto_register_dependencies: bool = True
+    skip_existing: bool = True
 
 class ToolRegistry(BaseModel):
     """Registry for agent tools"""
@@ -17,6 +19,7 @@ class ToolRegistry(BaseModel):
     name: str = "ToolRegistry"
     config: ToolRegistryConfig = Field(default_factory=ToolRegistryConfig)
     entries: Dict[str, Type[BaseTool]] = Field(default_factory=dict)
+    tool_dependencies: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
     
     model_config = {
         "arbitrary_types_allowed": True
@@ -82,14 +85,24 @@ class ToolRegistry(BaseModel):
     def list_tools(self) -> Dict[str, Dict[str, Any]]:
         """List all registered tools with their schemas"""
         try:
-            return {
-                name: {
-                    "schema": tool().get_schema(),
-                    "version": getattr(tool, "version", "1.0.0"),
-                    "permissions": getattr(tool, "required_permissions", [])
-                }
-                for name, tool in self.entries.items()
-            }
+            tool_info = {}
+            for name, tool_class in self.entries.items():
+                try:
+                    # Get class-level attributes instead of instantiating
+                    tool_info[name] = {
+                        "name": name,
+                        "description": getattr(tool_class, "description", "No description available"),
+                        "version": getattr(tool_class, "version", "1.0.0"),
+                        "permissions": getattr(tool_class, "required_permissions", []),
+                        "parameters": getattr(tool_class, "parameters", {}),
+                        "type": "simple" if name in [t.name for tools in SIMPLE_TOOLS.values() for t in tools] else "complex"
+                    }
+                except Exception as e:
+                    logger.warning(f"Error getting info for tool {name}: {str(e)}")
+                    continue
+                
+            return tool_info
+            
         except Exception as e:
             logger.error(f"Failed to list tools: {str(e)}")
             raise
@@ -112,6 +125,33 @@ class ToolRegistry(BaseModel):
         """Clear all registered tools"""
         self.entries.clear()
         logger.info("Cleared tool registry")
+    
+    def register_with_deps(self, name: str, tool_class: Type[BaseTool], dependencies: Dict[str, Any]):
+        """Register a tool with its dependencies"""
+        try:
+            if name in self.entries:
+                if self.config.allow_duplicates:
+                    logger.warning(f"Tool '{name}' already registered, overwriting")
+                else:
+                    logger.debug(f"Tool '{name}' already registered, skipping")
+                    return  # Skip instead of raising error
+                
+            self.entries[name] = tool_class
+            self.tool_dependencies[name] = dependencies
+            logger.debug(f"Registered tool '{name}' with dependencies")
+            
+        except Exception as e:
+            logger.error(f"Error registering tool '{name}': {str(e)}")
+            raise
+    
+    def get_instance(self, name: str) -> BaseTool:
+        """Get a tool instance with its dependencies"""
+        if name not in self.entries:
+            raise KeyError(f"Tool '{name}' not found")
+            
+        tool_class = self.entries[name]
+        dependencies = self.tool_dependencies.get(name, {})
+        return tool_class(**dependencies)
 
 # Create singleton instance
 tool_registry = ToolRegistry()

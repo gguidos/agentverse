@@ -2,6 +2,9 @@ from typing import Dict, Any, Optional, List
 from bson import ObjectId
 from pymongo.errors import DuplicateKeyError
 from src.core.infrastructure.db.mongo_client import MongoDBClient
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AgentRepository:
     """Repository for agent persistence"""
@@ -11,9 +14,24 @@ class AgentRepository:
         
     def _serialize_agent(self, agent: Dict[str, Any]) -> Dict[str, Any]:
         """Convert MongoDB document to serializable dict"""
-        if agent and "_id" in agent:
-            agent["_id"] = str(agent["_id"])
-        return agent
+        try:
+            if not agent:
+                return None
+            
+            serialized = dict(agent)  # Create a copy
+            if "_id" in serialized:
+                serialized["_id"] = str(serialized["_id"])
+            
+            # Ensure required fields exist
+            serialized.setdefault("id", str(serialized.get("_id")))
+            serialized.setdefault("capabilities", [])
+            serialized.setdefault("metadata", {})
+            
+            return serialized
+            
+        except Exception as e:
+            logger.error(f"Error serializing agent: {str(e)}", exc_info=True)
+            raise
         
     async def create(self, agent_data: Dict[str, Any]) -> str:
         """Create new agent"""
@@ -30,9 +48,27 @@ class AgentRepository:
         
     async def list_agents(self) -> List[Dict[str, Any]]:
         """List all agents"""
-        cursor = self.collection.find({})
-        agents = await cursor.to_list(length=None)
-        return [self._serialize_agent(agent) for agent in agents]
+        try:
+            logger.debug("Attempting to fetch agents from database")
+            # Use empty filter to get all documents
+            cursor = self.collection.find({})
+            agents = await cursor.to_list(length=None)
+            logger.debug(f"Found {len(agents)} agents in database")
+            
+            # Ensure proper serialization
+            serialized = []
+            for agent in agents:
+                if agent:
+                    serialized_agent = self._serialize_agent(agent)
+                    if serialized_agent:
+                        serialized.append(serialized_agent)
+                        
+            logger.debug(f"Successfully serialized {len(serialized)} agents")
+            return serialized
+            
+        except Exception as e:
+            logger.error(f"Error listing agents: {str(e)}", exc_info=True)
+            raise
         
     async def find_by_name_and_type(self, name: str, type: str) -> Optional[Dict[str, Any]]:
         """Find agent by name and type"""
