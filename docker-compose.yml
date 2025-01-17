@@ -30,7 +30,7 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - mongo
+      - mongodb
       - prometheus
       - redis
     networks:
@@ -42,13 +42,15 @@ services:
       retries: 3
 
   # MongoDB Service
-  mongo:
-    image: mongo:4.4
+  mongodb:
+    image: mongo:latest
     container_name: mongo
     ports:
       - "27017:27017"
     networks:
       - monitoring
+    volumes:
+      - mongodb_data:/data/db
 
   # Prometheus Service
   prometheus:
@@ -81,6 +83,9 @@ services:
       - "6379:6379"
     networks:
       - monitoring
+
+volumes:
+  mongodb_data:
 
 networks:
   monitoring:

@@ -18,6 +18,7 @@ from src.core.infrastructure.fs.split_document import SplitDocument
 from typing import Optional, Any
 from fastapi import Depends
 from src.core.agentverse.llm import get_llm
+from src.core.repositories.agent_repository import AgentRepository
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
@@ -33,6 +34,12 @@ class Container(containers.DeclarativeContainer):
     # Add explicit configuration for AWS
     config.aws.documents_bucket.from_env("AWS_DOCUMENTS_BUCKET")
 
+    # Add MongoDB configuration
+    config.mongodb.from_dict({
+        "uri": "mongodb://mongodb:27017",
+        "db_name": "agentverse"
+    })
+
     s3_client = providers.Singleton(
         S3Client,
         region_name=config.aws.region_name,
@@ -41,8 +48,8 @@ class Container(containers.DeclarativeContainer):
     # Set up the MongoDB client using a Singleton provider
     mongo_client = providers.Singleton(
         MongoDBClient,
-        db_uri=config.db_uri,
-        db_name=config.db_name
+        db_uri=config.mongodb.uri,
+        db_name=config.mongodb.db_name
     )
 
     # Redis Client (Singleton using the new RedisClient class)
@@ -133,6 +140,12 @@ class Container(containers.DeclarativeContainer):
         rabbitmq_repository=rabbitmq_repository
     )
 
+    # Add agent repository
+    agent_repository = providers.Factory(
+        AgentRepository,
+        mongo_client=mongo_client
+    )
+
 async def get_llm_service() -> Any:
     """Get LLM service instance"""
     container = Container()
@@ -141,4 +154,9 @@ async def get_llm_service() -> Any:
         llm_type=llm_config.get("type"),
         **llm_config
     )
+
+async def get_agent_repository() -> AgentRepository:
+    """Get agent repository instance"""
+    container = Container()
+    return container.agent_repository()
 

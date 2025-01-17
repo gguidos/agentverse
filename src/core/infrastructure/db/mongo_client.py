@@ -14,10 +14,10 @@ class MongoDBClient:
             db_name (str): Database name.
             db_collection_name (str): Collection name.
         """
+        self.client = AsyncIOMotorClient(db_uri)
+        self.db = self.client[db_name]
         self.db_uri = db_uri
         self.db_name = db_name
-        self.client: Optional[AsyncIOMotorClient] = None
-        self.db = None
         self.collection = None
 
     async def connect(self) -> None:
