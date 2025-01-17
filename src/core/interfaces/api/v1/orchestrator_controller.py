@@ -3,7 +3,10 @@ from typing import Dict, Any, List
 import logging
 from src.core.services.environment_service import EnvironmentService
 from src.core.dependencies.di_container import get_environment_service
-from .models.orchestrator import OrchestratorConfigRequest
+from .models.orchestrator import (
+    OrchestratorConfigRequest,
+    AgentRoleConfig
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

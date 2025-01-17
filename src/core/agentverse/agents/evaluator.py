@@ -14,6 +14,7 @@ from src.core.agentverse.memory import BaseMemory
 from src.core.agentverse.services.llm import BaseLLMService
 from src.core.agentverse.message_bus import BaseMessageBus
 from src.core.agentverse.registry import agent_registry
+from src.core.agentverse.agents.models.traits import EvaluationStyle, EvaluatorTraits
 
 logger = logging.getLogger(__name__)
 
@@ -45,14 +46,12 @@ class EvaluationResult(BaseModel):
     timestamp: float
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class EvaluatorConfig(AgentConfig):
-    """Evaluator configuration"""
-    evaluation_interval: float = 1.0
-    batch_size: int = 10
-    min_context: int = 3
-    metrics_threshold: float = 0.7
-    distributed: bool = False
-    llm_config: Dict[str, Any] = Field(default_factory=dict)
+class EvaluatorConfig(BaseModel):
+    """Configuration for evaluator agents"""
+    evaluation_type: str = "general"
+    traits: EvaluatorTraits = Field(default_factory=lambda: EvaluatorTraits())
+    metrics: List[str] = []
+    rubric: Optional[Dict[str, Any]] = None
 
 @agent_registry.register("evaluator")
 class EvaluatorAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
@@ -79,6 +78,7 @@ class EvaluatorAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
         
         self.config = config
         self.message_bus = message_bus
+        self.traits = config.traits
         
         # Register handlers
         self.register_handler(MessageType.CHAT, self.handle_chat)
@@ -305,3 +305,67 @@ class EvaluatorAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
             except Exception as e:
                 logger.error(f"Evaluation processing failed: {str(e)}")
                 await asyncio.sleep(1) 
+    
+    async def evaluate(self, content: str) -> EvaluationResult:
+        """Evaluate content based on agent's traits"""
+        
+        # Adjust prompt based on evaluation style
+        style_prompts = {
+            EvaluationStyle.SKEPTIC: """
+                Critically examine this content with a skeptical mindset.
+                Question assumptions, verify claims, and identify potential issues.
+                Set a high bar for accepting statements as true.
+            """,
+            EvaluationStyle.OPTIMISTIC: """
+                Evaluate this content while focusing on its potential and positive aspects.
+                Look for opportunities and promising elements.
+                Consider how challenges could be overcome.
+            """,
+            # ... other style prompts ...
+        }
+        
+        base_prompt = style_prompts.get(self.traits.style, "Evaluate the following content:")
+        
+        # Add bias considerations
+        bias_instructions = self._generate_bias_instructions()
+        
+        # Generate final prompt
+        evaluation_prompt = f"""
+        {base_prompt}
+        
+        Content to evaluate:
+        {content}
+        
+        {bias_instructions}
+        
+        Focus especially on these areas:
+        {', '.join(self.traits.focus_areas)}
+        
+        Provide a structured evaluation including:
+        1. Overall assessment
+        2. Specific points (positive and negative)
+        3. Confidence level for each point
+        4. Recommendations for improvement
+        """
+        
+        # Get evaluation from LLM
+        response = await self.llm.generate(evaluation_prompt)
+        
+        # Process response based on traits
+        return self._process_evaluation(response)
+    
+    def _generate_bias_instructions(self) -> str:
+        """Generate instructions based on configured biases"""
+        if not self.traits.bias_factors:
+            return "Maintain objectivity in your evaluation."
+            
+        instructions = ["Consider these specific factors with their relative importance:"]
+        for factor, strength in self.traits.bias_factors.items():
+            instructions.append(f"- {factor}: {strength * 100}% weight")
+            
+        return "\n".join(instructions)
+    
+    def _process_evaluation(self, llm_response: str) -> EvaluationResult:
+        """Process LLM response considering traits and confidence threshold"""
+        # Implementation of response processing
+        pass 
