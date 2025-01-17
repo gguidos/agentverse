@@ -2,7 +2,7 @@
 Message bus implementations
 """
 
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, Any
 from src.core.agentverse.message import Message
 from src.core.agentverse.exceptions import MessageBusError
 
@@ -69,6 +69,27 @@ class InMemoryMessageBus(BaseMessageBus):
     async def get_topics(self) -> List[str]:
         """Get all topics"""
         return list(self.topics.keys())
+
+class MessageBus:
+    """Message bus for agent communication"""
+    
+    def __init__(
+        self,
+        transport_type: str = "memory",
+        host: Optional[str] = None,
+        port: Optional[int] = None,
+        channel_capacity: int = 100,
+        delivery_guarantee: str = "at_least_once"
+    ):
+        self.transport_type = transport_type
+        self.host = host
+        self.port = port
+        self.channel_capacity = channel_capacity
+        self.delivery_guarantee = delivery_guarantee
+        
+    async def enable_persistence(self, storage_path: str) -> None:
+        """Enable message persistence"""
+        pass
 
 # Default message bus instance
 message_bus = InMemoryMessageBus()

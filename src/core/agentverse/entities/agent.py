@@ -1,7 +1,7 @@
 """Agent Entity Module"""
 
 from typing import Dict, Any, List, Optional
-from pydantic import Field
+from pydantic import Field, BaseModel
 
 from src.core.agentverse.entities.base import (
     BaseEntity,
@@ -16,11 +16,20 @@ class AgentState(EntityState):
     task_count: int = 0
     capabilities: List[str] = Field(default_factory=list)
 
-class AgentConfig(EntityConfig):
+class AgentConfig(BaseModel):
     """Agent configuration"""
-    capabilities: List[str] = Field(default_factory=list)
+    id: str
+    type: str
+    name: str
+    capabilities: List[str] = []
     max_tasks: int = 5
     memory_limit: float = 100.0
+    metadata: Dict[str, Any] = {}
+    llm: Any = None
+    
+    def get(self, key: str, default: Any = None) -> Any:
+        """Get config value with fallback"""
+        return getattr(self, key, default)
 
 class Agent(BaseEntity):
     """Agent entity implementation"""

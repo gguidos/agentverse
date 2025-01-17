@@ -1,19 +1,19 @@
 """Base agent interface"""
 
-from abc import ABC, abstractmethod
 from typing import Dict, Any
+from src.core.agentverse.entities.agent import AgentConfig
 
-class BaseAgent(ABC):
-    """Base class for all agents"""
+class BaseAgent:
+    """Base agent class"""
     
-    def __init__(self, config: Dict[str, Any], llm: 'BaseLLM'):
-        """Initialize agent with config and LLM"""
-        super().__init__()  # Initialize ABC
+    def __init__(self, config: AgentConfig):
+        """Initialize base agent
+        
+        Args:
+            config: Agent configuration
+        """
         self.config = config
-        self.llm = llm
-        self.name = config.get("name", "agent")
-    
-    @abstractmethod
+        
     async def process_message(self, message: str) -> str:
-        """Process incoming message and return response"""
-        pass 
+        """Process incoming message"""
+        raise NotImplementedError() 

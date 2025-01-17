@@ -15,9 +15,20 @@ from src.core.services.vectorstore_orchestrator_service import VectorstoreOrches
 from src.core.services.indexing import IndexingService
 from src.core.utils.calculate_chunk_ids import CalculateChunkIds
 from src.core.infrastructure.fs.split_document import SplitDocument
+from typing import Optional, Any
+from fastapi import Depends
+from src.core.agentverse.llm import get_llm
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
+    
+    # Add LLM configuration with defaults
+    config.llm.from_dict({
+        "type": "mock",
+        "model": "gpt-3.5-turbo",
+        "temperature": 0.7,
+        "max_tokens": 1000
+    })
     
     # Add explicit configuration for AWS
     config.aws.documents_bucket.from_env("AWS_DOCUMENTS_BUCKET")
@@ -120,5 +131,14 @@ class Container(containers.DeclarativeContainer):
     # Consume User Auth Queue use case
     consume_queue = providers.Factory(
         rabbitmq_repository=rabbitmq_repository
+    )
+
+async def get_llm_service() -> Any:
+    """Get LLM service instance"""
+    container = Container()
+    llm_config = container.config.llm()
+    return get_llm(
+        llm_type=llm_config.get("type"),
+        **llm_config
     )
 

@@ -91,3 +91,6 @@ kaleido>=0.2.1  # For static image export
 
 # Vector Operations
 pandas>=1.3.0
+
+# AI Files
+aiofiles>=23.2.1
