@@ -1,4 +1,6 @@
-from typing import Set, Dict, Any, Optional, ClassVar
+"""Evaluation Visibility Module"""
+
+from typing import Dict, Set, Any, Optional
 from pydantic import Field, ConfigDict
 from datetime import datetime
 import logging
@@ -8,9 +10,9 @@ from src.core.agentverse.environment.visibility.base import (
     VisibilityConfig,
     VisibilityMetrics
 )
-from src.core.agentverse.environment.registry import visibility_registry
 from src.core.agentverse.environment.base import BaseEnvironment
 from src.core.agentverse.environment.exceptions import ActionError
+from src.core.agentverse.environment.decorators import visibility
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,6 @@ class EvaluationVisibilityConfig(VisibilityConfig):
     final_round_count: Optional[int] = None
     track_phase_changes: bool = True
     allow_self_visibility: bool = True
-    broadcast_phase_change: bool = True
     
     model_config = ConfigDict(
         extra="allow"
@@ -28,216 +29,74 @@ class EvaluationVisibilityConfig(VisibilityConfig):
 
 class EvaluationMetrics(VisibilityMetrics):
     """Additional metrics for evaluation visibility"""
-    phase_changes: int = 0
     blind_rounds: int = 0
     full_rounds: int = 0
+    phase_changes: int = 0
     phase_durations: Dict[str, float] = Field(default_factory=dict)
 
-@visibility_registry.register("blind_judge")
-class BlindJudgeVisibility(BaseVisibility):
-    """Visibility handler for blind evaluation rounds
+@visibility
+class EvaluationVisibility(BaseVisibility):
+    """Evaluation-specific visibility implementation"""
     
-    In final rounds, each judge can only see their own messages
-    to ensure independent evaluation.
-    """
+    name = "evaluation_visibility"
+    description = "Provides visibility control for evaluation phases"
+    version = "1.0.0"
     
-    name: ClassVar[str] = "blind_judge_visibility"
-    description: ClassVar[str] = "Visibility handler for blind evaluation rounds"
-    version: ClassVar[str] = "1.1.0"
+    def __init__(self, config: Optional[EvaluationVisibilityConfig] = None):
+        super().__init__(config or EvaluationVisibilityConfig())
+        self.metrics = EvaluationMetrics()
+        self.current_phase = "full"
+        self.phase_start = None
     
-    def __init__(
+    async def check_visibility(
         self,
-        config: Optional[EvaluationVisibilityConfig] = None
-    ):
-        super().__init__(config=config or EvaluationVisibilityConfig())
-        self.eval_metrics = EvaluationMetrics()
-        self.current_phase: str = "full"
-        self.phase_start: Optional[datetime] = None
-    
-    async def _update_visibility(
-        self,
-        environment: BaseEnvironment
-    ) -> None:
-        """Update agent visibility based on turn number
-        
-        Args:
-            environment: Environment to update visibility for
-            
-        Raises:
-            ActionError: If update fails
-        """
+        source: str,
+        target: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Check visibility between source and target"""
         try:
-            # Determine phase
-            new_phase = self._get_current_phase(environment)
+            start_time = datetime.utcnow()
             
-            # Track phase change
-            if new_phase != self.current_phase:
-                await self._handle_phase_change(
-                    environment,
-                    new_phase
-                )
+            # Basic validation
+            if not source or not target:
+                return False
+                
+            # Check self visibility
+            if source == target:
+                return self.config.allow_self_visibility
+                
+            # Check current phase
+            result = self.current_phase == "full"
             
-            # Update visibility based on phase
-            if new_phase == "blind":
-                await self._set_blind_visibility(environment)
+            # Update metrics
+            duration = (datetime.utcnow() - start_time).total_seconds()
+            self.metrics.update(allowed=result, duration=duration)
+            
+            # Track phase-specific metrics
+            if result:
+                self.metrics.full_rounds += 1
             else:
-                await self._set_full_visibility(environment)
+                self.metrics.blind_rounds += 1
+            
+            return result
             
         except Exception as e:
-            logger.error(f"Failed to update judge visibility: {str(e)}")
-            raise ActionError(
-                message=str(e),
-                action=self.name,
-                details={
-                    "phase": self.current_phase,
-                    "turn": environment.state.current_turn
-                }
-            )
+            logger.error(f"Evaluation visibility check failed: {str(e)}")
+            return False
     
-    def _get_current_phase(
-        self,
-        environment: BaseEnvironment
-    ) -> str:
-        """Determine current visibility phase
-        
-        Args:
-            environment: Environment instance
+    def switch_phase(self, phase: str) -> None:
+        """Switch visibility phase"""
+        if phase not in ["full", "blind"]:
+            raise ValueError(f"Invalid phase: {phase}")
             
-        Returns:
-            Current phase ("blind" or "full")
-        """
-        if not self.config.blind_final_rounds:
-            return "full"
+        if phase != self.current_phase:
+            self.metrics.phase_changes += 1
             
-        final_rounds = (
-            self.config.final_round_count or
-            len(environment.agents)
-        )
-        
-        if environment.state.max_turns:
-            remaining = environment.state.max_turns - environment.state.current_turn
-            return "blind" if remaining <= final_rounds else "full"
-            
-        return "full"
-    
-    async def _handle_phase_change(
-        self,
-        environment: BaseEnvironment,
-        new_phase: str
-    ) -> None:
-        """Handle visibility phase change
-        
-        Args:
-            environment: Environment instance
-            new_phase: New visibility phase
-        """
-        if self.config.track_phase_changes:
             # Track phase duration
             if self.phase_start:
                 duration = (datetime.utcnow() - self.phase_start).total_seconds()
-                self.eval_metrics.phase_durations[self.current_phase] = duration
+                self.metrics.phase_durations[self.current_phase] = duration
             
-            self.eval_metrics.phase_changes += 1
-            
-        # Update phase tracking
-        self.current_phase = new_phase
-        self.phase_start = datetime.utcnow()
-        
-        # Broadcast phase change if configured
-        if self.config.broadcast_phase_change:
-            await self._broadcast_phase_change(environment)
-    
-    async def _broadcast_phase_change(
-        self,
-        environment: BaseEnvironment
-    ) -> None:
-        """Broadcast phase change to agents
-        
-        Args:
-            environment: Environment instance
-        """
-        for agent in environment.agents:
-            if hasattr(agent, 'on_visibility_change'):
-                await agent.on_visibility_change(
-                    phase=self.current_phase,
-                    visible_agents=self.state.visibility_map.get(
-                        agent.name,
-                        set()
-                    )
-                )
-    
-    async def _set_blind_visibility(
-        self,
-        environment: BaseEnvironment
-    ) -> None:
-        """Set judges to only see their own messages
-        
-        Args:
-            environment: Environment instance
-        """
-        self.eval_metrics.blind_rounds += 1
-        
-        for agent in environment.agents:
-            visible = {agent.name} if self.config.allow_self_visibility else set()
-            self.state.visibility_map[agent.name] = visible
-            
-            # Update agent's receiver set if supported
-            if hasattr(agent, 'set_receiver'):
-                await agent.set_receiver(visible)
-    
-    async def _set_full_visibility(
-        self,
-        environment: BaseEnvironment
-    ) -> None:
-        """Set full visibility between agents
-        
-        Args:
-            environment: Environment instance
-        """
-        self.eval_metrics.full_rounds += 1
-        agent_names = {agent.name for agent in environment.agents}
-        
-        for agent in environment.agents:
-            # Can see everyone (optionally except self)
-            visible = (
-                agent_names if self.config.allow_self_visibility
-                else agent_names - {agent.name}
-            )
-            self.state.visibility_map[agent.name] = visible
-            
-            # Update agent's receiver set if supported
-            if hasattr(agent, 'set_receiver'):
-                await agent.set_receiver(visible)
-    
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get all metrics including evaluation metrics
-        
-        Returns:
-            Combined metrics
-        """
-        metrics = super().get_metrics()
-        eval_metrics = self.eval_metrics.model_dump()
-        
-        # Add phase distribution
-        total_rounds = (
-            self.eval_metrics.blind_rounds +
-            self.eval_metrics.full_rounds
-        )
-        if total_rounds > 0:
-            eval_metrics["blind_phase_ratio"] = (
-                self.eval_metrics.blind_rounds / total_rounds
-            )
-        
-        metrics.update(eval_metrics)
-        return metrics
-    
-    def reset(self) -> None:
-        """Reset visibility state"""
-        super().reset()
-        self.eval_metrics = EvaluationMetrics()
-        self.current_phase = "full"
-        self.phase_start = None
-        logger.info(
-            f"Reset {self.name} visibility handler "
-            f"(phase: {self.current_phase})"
-        ) 
+            self.current_phase = phase
+            self.phase_start = datetime.utcnow() 

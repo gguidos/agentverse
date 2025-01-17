@@ -4,24 +4,23 @@ System integration tests
 
 import pytest
 from typing import List
+from datetime import datetime
 
-from src.core.agentverse.message_bus import InMemoryMessageBus
+from src.core.agentverse.agents import BaseAgent, UserAgent
 from src.core.agentverse.message import Message, MessageType, MessageRole
-from src.core.agentverse.agents import BaseAgent
-from src.core.agentverse.agents.user import UserAgent
+from src.core.agentverse.message_bus import InMemoryMessageBus
 from src.core.agentverse.exceptions import MessageBusError
-from src.core.agentverse.testing.mocks import MockLLM
+from src.core.agentverse.testing.mocks.llm import MockLLM
 
 @pytest.fixture
-async def llm_service():
+def llm_service():
     """Create mock LLM service"""
-    return MockLLM()
+    return MockLLM(responses=["Hi!", "How can I help?", "Thanks!"])
 
 @pytest.fixture
 async def message_bus():
     """Create message bus for testing"""
-    bus = InMemoryMessageBus()
-    yield bus
+    return InMemoryMessageBus()
 
 @pytest.fixture
 async def test_agents(llm_service) -> List[BaseAgent]:
@@ -30,16 +29,17 @@ async def test_agents(llm_service) -> List[BaseAgent]:
         UserAgent(
             name="test_user_1",
             user_id="user1",
-            llm_service=llm_service
+            llm=llm_service
         ),
         UserAgent(
-            name="test_user_2", 
+            name="test_user_2",
             user_id="user2",
-            llm_service=llm_service
+            llm=llm_service
         )
     ]
     return agents
 
+@pytest.mark.asyncio
 async def test_basic_system_setup(message_bus, test_agents):
     """Test basic system setup and message flow"""
     

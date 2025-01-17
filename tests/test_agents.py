@@ -4,11 +4,12 @@ Agent tests
 
 import pytest
 from typing import Type
+from datetime import datetime
 
 from src.core.agentverse.agents import BaseAgent
 from src.core.agentverse.agents.assistant import AssistantAgent
-from src.core.agentverse.message import Message
-from src.core.agentverse.testing.mocks import MockLLM
+from src.core.agentverse.message import Message, MessageType, MessageRole
+from src.core.agentverse.testing.mocks.llm import MockLLM, MockLLMConfig
 
 class TestAssistantAgent:
     """Test assistant agent implementation"""
@@ -16,9 +17,23 @@ class TestAssistantAgent:
     @pytest.fixture(autouse=True)
     async def setup(self):
         """Setup test fixtures"""
-        self.llm = MockLLM()
+        self.llm = MockLLM(
+            responses=["Hello!", "How can I help?"],
+            config=MockLLMConfig(model="mock-llm")
+        )
         self.memory = None  # Add mock memory if needed
     
+    async def create_test_agent(
+        self,
+        agent_class: Type[BaseAgent],
+        **kwargs
+    ) -> BaseAgent:
+        """Create agent for testing"""
+        agent = agent_class(**kwargs)
+        agent.llm = self.llm
+        return agent
+    
+    @pytest.mark.asyncio
     async def test_basic_response(self):
         """Test basic message response"""
         agent = await self.create_test_agent(
@@ -29,8 +44,12 @@ class TestAssistantAgent:
         message = Message.user(content="Hello")
         response = await agent.process_message(message)
         
-        assert response.content == "Mock response"
+        assert response.content == "Hello!"
+        assert response.type == MessageType.ASSISTANT
+        assert response.role == MessageRole.ASSISTANT
+        assert response.sender_id == "test_assistant"
     
+    @pytest.mark.asyncio
     async def test_memory_storage(self):
         """Test message memory storage"""
         agent = await self.create_test_agent(
@@ -41,20 +60,9 @@ class TestAssistantAgent:
         message = Message.user(content="Test message")
         await agent.process_message(message)
         
-        history = agent.get_message_history()
-        assert len(history) == 2  # Input + response
-    
-    async def create_test_agent(
-        self,
-        agent_class: Type[BaseAgent],
-        **kwargs
-    ) -> BaseAgent:
-        """Create agent for testing"""
-        return agent_class(
-            llm_service=self.llm,
-            memory=self.memory,
-            **kwargs
-        )
+        assert len(agent.message_history) == 2  # Input + response
+        assert agent.message_history[0].content == "Test message"
+        assert agent.message_history[1].content == "Hello!"
 
 @pytest.mark.asyncio
 async def test_agent_creation():

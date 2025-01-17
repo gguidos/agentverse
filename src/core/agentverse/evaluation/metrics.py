@@ -1,3 +1,5 @@
+"""Evaluation Metrics Module"""
+
 from typing import Dict, Any, List, Optional, ClassVar
 from pydantic import BaseModel, Field
 import numpy as np
@@ -5,6 +7,54 @@ from datetime import datetime
 import logging
 
 logger = logging.getLogger(__name__)
+
+class BaseMetric(BaseModel):
+    """Base class for evaluation metrics"""
+    
+    name: str = Field(description="Metric name")
+    value: float = Field(description="Metric value")
+    description: Optional[str] = None
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert metric to dictionary"""
+        return {
+            "name": self.name,
+            "value": self.value,
+            "description": self.description,
+            "timestamp": self.timestamp.isoformat(),
+            "metadata": self.metadata
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "BaseMetric":
+        """Create metric from dictionary"""
+        return cls(**data)
+
+class PerformanceMetrics(BaseMetric):
+    """Performance-related metrics"""
+    
+    LATENCY: ClassVar[str] = "latency"
+    THROUGHPUT: ClassVar[str] = "throughput" 
+    ERROR_RATE: ClassVar[str] = "error_rate"
+    MEMORY_USAGE: ClassVar[str] = "memory_usage"
+    CPU_USAGE: ClassVar[str] = "cpu_usage"
+
+class QualityMetrics(BaseMetric):
+    """Quality-related metrics"""
+    
+    ACCURACY: ClassVar[str] = "accuracy"
+    PRECISION: ClassVar[str] = "precision"
+    RECALL: ClassVar[str] = "recall"
+    F1_SCORE: ClassVar[str] = "f1_score"
+    
+class ResourceMetrics(BaseMetric):
+    """Resource utilization metrics"""
+    
+    TOKEN_USAGE: ClassVar[str] = "token_usage"
+    API_CALLS: ClassVar[str] = "api_calls"
+    STORAGE_USED: ClassVar[str] = "storage_used"
 
 class TextQualityMetrics(BaseModel):
     """Metrics for evaluating text quality"""

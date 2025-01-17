@@ -1,9 +1,12 @@
+"""Resource management tests"""
+
 import pytest
 import asyncio
+import logging
 from src.core.agentverse.resources import (
     RateLimiter,
-    ResourceManager,
-    ResourceQuota
+    ResourceQuota,
+    QuotaExceededError
 )
 
 @pytest.mark.asyncio
@@ -24,17 +27,17 @@ async def test_rate_limiter():
     assert await limiter.acquire()  # Should succeed
 
 @pytest.mark.asyncio
-async def test_resource_quota():
-    manager = ResourceManager()
+async def test_resource_quota(caplog):
+    """Test resource quota management"""
+    quota = ResourceQuota(max_memory=100)
     
-    # Add quota
-    await manager.add_quota(
-        "memory",
-        max_value=100,
-        unit="MB"
-    )
+    with caplog.at_level(logging.WARNING):
+        # Allocate memory
+        quota.allocate_memory(90)
+        
+        # Try to exceed quota
+        with pytest.raises(QuotaExceededError):
+            quota.allocate_memory(20)
     
-    # Test quota check
-    assert await manager.check_quota("memory", 20)  # Should succeed
-    await manager.consume_quota("memory", 90)
-    assert not await manager.check_quota("memory", 20)  # Should fail 
+    # Verify quota exceeded warning was logged
+    assert any("Quota exceeded" in r.message for r in caplog.records) 

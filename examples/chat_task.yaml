@@ -1,0 +1,24 @@
+name: simple_chat
+description: Simple chat between user and assistant
+max_rounds: 5
+
+environment:
+  type: chat
+  message_bus:
+    type: in_memory
+
+agents:
+  - type: assistant
+    name: assistant_1
+    llm:
+      type: gpt3
+      model: gpt-3.5-turbo
+      temperature: 0.7
+    
+  - type: user
+    name: user_1
+    llm:
+      type: mock
+      responses:
+        - "Hello!"
+        - "How are you?" 

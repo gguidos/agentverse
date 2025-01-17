@@ -3,95 +3,73 @@ Recovery mechanisms
 """
 
 import logging
-import asyncio
+from typing import TypeVar, Callable, Any, Optional
 from functools import wraps
-from typing import Any, Callable, Optional, Type, Tuple
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-class RetryConfig(BaseModel):
-    """Configuration for retry handling"""
-    
-    max_attempts: int = Field(default=3, description="Maximum retry attempts")
-    delay_seconds: float = Field(default=1.0, description="Initial delay between retries")
-    backoff_factor: float = Field(default=2.0, description="Exponential backoff multiplier")
-    exceptions: Tuple[Type[Exception], ...] = Field(
-        default=(Exception,),
-        description="Exceptions to catch and retry"
-    )
-
-    model_config = {
-        "json_schema_extra": {
-            "examples": [{
-                "max_attempts": 3,
-                "delay_seconds": 1.0,
-                "backoff_factor": 2.0,
-                "exceptions": ["Exception"]
-            }]
-        }
-    }
+T = TypeVar('T')
 
 class RetryHandler:
-    """Handles retry logic for operations"""
+    """Retry handler for async operations"""
     
-    def __init__(self, config: Optional[RetryConfig] = None):
-        self.config = config or RetryConfig()
+    def __init__(self, max_retries: int = 3):
+        self.max_retries = max_retries
     
-    def handle(self, func: Callable) -> Callable:
-        """Decorator for retry handling"""
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            attempts = 0
-            last_error = None
-            delay = self.config.delay_seconds
-            
-            while attempts < self.config.max_attempts:
-                try:
-                    return await func(*args, **kwargs)
-                except self.config.exceptions as e:
-                    attempts += 1
-                    last_error = e
-                    logger.warning(
-                        f"Attempt {attempts} failed: {str(e)}"
-                    )
-                    if attempts < self.config.max_attempts:
-                        await asyncio.sleep(delay)
-                        delay *= self.config.backoff_factor
-            
-            raise last_error
-            
-        return wrapper
-
-def circuit_breaker(func: Optional[Callable] = None, *, max_failures: int = 3) -> Callable:
-    """Circuit breaker decorator"""
-    def decorator(func: Callable) -> Callable:
-        failures = 0
+    async def handle(self, operation: Callable[..., T], *args, **kwargs) -> T:
+        """Handle retries for operation"""
+        attempts = 0
+        last_error = None
         
-        @wraps(func)
-        async def wrapper(*args, **kwargs):
-            nonlocal failures
-            
-            if failures >= max_failures:
-                logger.error("Circuit open - too many failures")
-                raise RuntimeError("Circuit breaker open")
-                
+        while attempts < self.max_retries:
             try:
-                result = await func(*args, **kwargs)
-                failures = 0  # Reset on success
-                return result
+                attempts += 1
+                return await operation(*args, **kwargs)
             except Exception as e:
-                failures += 1
-                raise
-                
-        return wrapper
+                last_error = e
+                logger.warning(f"Attempt {attempts} failed: {str(e)}")
         
-    if func is None:
-        return decorator
-    return decorator(func)
+        if last_error:
+            raise last_error
+        raise RuntimeError("All retry attempts failed")
+
+class CircuitBreaker:
+    """Circuit breaker for async operations"""
+    
+    def __init__(self, failure_threshold: int = 3):
+        self.failure_threshold = failure_threshold
+        self.failure_count = 0
+        self.is_open = False
+    
+    async def execute(self, operation: Callable[..., T], *args, **kwargs) -> T:
+        """Execute operation with circuit breaker"""
+        if self.is_open:
+            logger.error("Circuit open - too many failures")
+            raise RuntimeError("Circuit breaker open")
+        
+        try:
+            result = await operation(*args, **kwargs)
+            self.failure_count = 0
+            return result
+        except Exception as e:
+            self.failure_count += 1
+            if self.failure_count >= self.failure_threshold:
+                self.is_open = True
+            raise e
+
+def circuit_breaker(failure_threshold: int = 3):
+    """Circuit breaker decorator"""
+    breaker = CircuitBreaker(failure_threshold=failure_threshold)
+    
+    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+        @wraps(func)
+        async def wrapper(*args, **kwargs) -> T:
+            return await breaker.execute(func, *args, **kwargs)
+        return wrapper
+    return decorator
 
 __all__ = [
-    "RetryConfig",
     "RetryHandler",
+    "CircuitBreaker",
     "circuit_breaker"
 ] 

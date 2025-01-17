@@ -90,17 +90,15 @@ from src.core.agentverse.evaluation.metrics import (
     BaseMetric,
     PerformanceMetrics,
     QualityMetrics,
-    ResourceMetrics
+    ResourceMetrics,
+    TextQualityMetrics
 )
 from src.core.agentverse.evaluation.evaluators import (
     PerformanceEvaluator,
     QualityEvaluator,
     ResourceEvaluator
 )
-from src.core.agentverse.evaluation.registry import (
-    EvaluatorRegistry,
-    MetricRegistry
-)
+from src.core.agentverse.evaluation.registry import evaluator_registry
 
 __all__ = [
     # Base
@@ -112,6 +110,7 @@ __all__ = [
     'PerformanceMetrics',
     'QualityMetrics',
     'ResourceMetrics',
+    'TextQualityMetrics',
     
     # Evaluators
     'PerformanceEvaluator',
@@ -119,8 +118,7 @@ __all__ = [
     'ResourceEvaluator',
     
     # Registry
-    'EvaluatorRegistry',
-    'MetricRegistry'
+    'evaluator_registry'
 ]
 
 # Version

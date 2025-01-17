@@ -1,0 +1,28 @@
+name: chat_simulation
+description: "Simple chat between two agents"
+max_steps: 10
+save_history: true
+
+environment:
+  type: chat
+  config:
+    name: chat_env
+    max_rounds: 10
+    track_metrics: true
+
+agents:
+  - type: assistant
+    name: assistant_1
+    llm:
+      type: gpt3
+      model: gpt-3.5-turbo
+      temperature: 0.7
+    
+  - type: user
+    name: user_1
+    llm:
+      type: mock
+      responses:
+        - "Hello!"
+        - "How are you?"
+        - "What can you help me with?" 

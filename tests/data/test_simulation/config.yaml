@@ -1,0 +1,25 @@
+name: test_simulation
+description: Test simulation configuration
+max_steps: 5
+
+environment:
+  type: basic
+  name: test_env
+
+agents:
+  - type: assistant
+    name: test_assistant
+    llm:
+      type: mock
+      responses: ["Hello!", "How can I help?"]
+  - type: user
+    name: test_user
+    llm:
+      type: mock
+      responses: ["Hi!", "I need help"]
+
+rules:
+  - type: basic
+    name: test_rule
+    condition: "True"
+    action: "pass" 

@@ -9,22 +9,26 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-class ResourceQuota(BaseModel):
-    """Resource quota configuration"""
-    
-    current: float = Field(default=0, description="Current resource usage")
-    max: float = Field(default=100, description="Maximum allowed usage")
-    unit: str = Field(default="units", description="Resource unit")
+class QuotaExceededError(Exception):
+    """Raised when resource quota is exceeded"""
+    pass
 
-    model_config = {
-        "json_schema_extra": {
-            "examples": [{
-                "current": 0,
-                "max": 100,
-                "unit": "MB"
-            }]
-        }
-    }
+class ResourceQuota(BaseModel):
+    """Resource quota"""
+    current: float = Field(default=0)
+    max: float = Field(default=100)
+    unit: str = Field(default="units")
+    
+    def allocate_memory(self, amount: float) -> None:
+        """Allocate memory"""
+        if self.current + amount > self.max:
+            logger.warning(f"Quota exceeded for 'memory': current={self.current}, requested={amount}, max={self.max}")
+            raise QuotaExceededError(f"Memory quota exceeded: {self.current + amount} > {self.max}")
+        self.current += amount
+    
+    def release_memory(self, amount: float) -> None:
+        """Release memory"""
+        self.current = max(0, self.current - amount)
 
 class RateLimiter(BaseModel):
     """Rate limiter configuration"""

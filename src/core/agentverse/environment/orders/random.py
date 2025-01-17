@@ -1,111 +1,84 @@
 """Random Order Module"""
 
 from typing import Dict, Any, Optional, List
-import random
-import asyncio
+from pydantic import Field, ConfigDict
 from datetime import datetime
+import random
+import logging
 
 from src.core.agentverse.environment.orders.base import (
     BaseOrder,
-    OrderStatus,
-    OrderResult
+    OrderConfig,
+    OrderResult,
+    OrderStatus
 )
+from src.core.agentverse.environment.base import BaseEnvironment
+from src.core.agentverse.environment.exceptions import ActionError
+from src.core.agentverse.environment.decorators import order
 
+logger = logging.getLogger(__name__)
+
+class RandomOrderConfig(OrderConfig):
+    """Configuration for random order"""
+    seed: Optional[int] = None
+    batch_size: int = 1
+    shuffle_batches: bool = True
+    track_order: bool = True
+    
+    model_config = ConfigDict(
+        extra="allow"
+    )
+
+@order
 class RandomOrder(BaseOrder):
     """Random execution order"""
     
-    def __init__(
-        self,
-        name: str,
-        tasks: List[Dict[str, Any]],
-        seed: Optional[int] = None
-    ):
-        """Initialize random order
-        
-        Args:
-            name: Order name
-            tasks: List of tasks to execute
-            seed: Optional random seed
-        """
-        super().__init__(name)
-        self.tasks = tasks
-        if seed is not None:
-            random.seed(seed)
+    name = "random_order"
+    description = "Executes tasks in random order"
+    version = "1.0.0"
     
-    async def execute(self, **kwargs) -> OrderResult:
+    def __init__(self, config: Optional[RandomOrderConfig] = None):
+        super().__init__(config or RandomOrderConfig())
+        self.rng = random.Random(self.config.seed)
+        self.execution_order = []
+    
+    async def execute(self, tasks: List[Dict[str, Any]]) -> OrderResult:
         """Execute tasks in random order"""
-        try:
-            self.status = OrderStatus.RUNNING
-            start_time = datetime.utcnow()
-            
-            # Randomize task order
-            tasks = self.tasks.copy()
-            random.shuffle(tasks)
-            
-            # Execute tasks sequentially in random order
-            results = []
-            for task in tasks:
-                try:
-                    result = await self._execute_task(task)
-                    results.append({
-                        "task": task,
-                        "result": result,
-                        "success": True
-                    })
-                except Exception as e:
-                    results.append({
-                        "task": task,
-                        "error": str(e),
-                        "success": False
-                    })
-            
-            # Check if all tasks succeeded
-            success = all(r["success"] for r in results)
-            
-            # Create result
-            self.result = OrderResult(
-                status=OrderStatus.COMPLETED if success else OrderStatus.FAILED,
-                data={
-                    "results": results,
-                    "execution_order": [t.get("action") for t in tasks]
-                },
-                start_time=start_time,
-                end_time=datetime.utcnow()
-            )
-            self.status = self.result.status
-            
-            return self.result
-            
-        except Exception as e:
-            self.status = OrderStatus.FAILED
-            self.result = OrderResult(
-                status=OrderStatus.FAILED,
-                error=str(e),
-                start_time=start_time,
-                end_time=datetime.utcnow()
-            )
-            return self.result
-    
-    async def cancel(self) -> None:
-        """Cancel random execution"""
-        self.status = OrderStatus.CANCELLED
-    
-    async def _execute_task(self, task: Dict[str, Any]) -> Any:
-        """Execute single task
+        # Create list of indices
+        indices = list(range(len(tasks)))
         
-        Args:
-            task: Task configuration
-            
-        Returns:
-            Task result
-        """
-        action = task.get("action")
-        args = task.get("args", {})
-        delay = task.get("delay", 0)
+        # Keep shuffling until order is different
+        shuffled = indices.copy()
+        while shuffled == indices:
+            random.shuffle(shuffled)
         
-        # Simulate task execution with optional delay
-        if delay:
-            await asyncio.sleep(delay)
-            
-        # TODO: Implement actual task execution
-        return f"Executed {action} with args {args}" 
+        # Execute tasks in shuffled order
+        results = []
+        for idx in shuffled:
+            task = tasks[idx]
+            try:
+                # Process task
+                result = await self._process_task(task)
+                results.append(result)
+            except Exception as e:
+                return OrderResult(
+                    status=OrderStatus.FAILED,
+                    error=str(e)
+                )
+        
+        return OrderResult(
+            status=OrderStatus.COMPLETED,
+            data={
+                "results": results,
+                "execution_order": shuffled
+            }
+        )
+    
+    async def _process_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+        """Process individual task"""
+        # Mock task processing
+        return {
+            "task_id": task.get("id"),
+            "action": task.get("action"),
+            "status": "completed"
+        } 
