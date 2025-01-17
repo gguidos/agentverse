@@ -25,6 +25,13 @@ class StorageConfig(BaseModel):
     file_store: Optional[Dict[str, Any]] = None
     metadata_store: Optional[Dict[str, Any]] = None
 
+class OrchestratorConfig(BaseModel):
+    """Configuration for orchestrator agent"""
+    goal_decomposition_strategy: str = "sequential"  # sequential, parallel, adaptive
+    coordination_style: str = "directive"  # directive, collaborative, autonomous
+    max_coordination_rounds: int = 5
+    success_criteria: Dict[str, Any] = {}
+
 class EnvironmentConfig(BaseModel):
     """Configuration for an environment"""
     # Core configurations
@@ -42,6 +49,8 @@ class EnvironmentConfig(BaseModel):
     llm_config: Optional[Dict[str, Any]] = None  # Default LLM config
     api_keys: Dict[str, str] = {}
     external_services: Dict[str, Dict[str, Any]] = {}
+    orchestrator: Optional[OrchestratorConfig] = None
+    orchestration_enabled: bool = False
 
 class Environment(BaseModel):
     """Environment model"""

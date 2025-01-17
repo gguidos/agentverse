@@ -11,6 +11,7 @@ from src.core.agentverse.environment.models import (
     ToolConfig,
     StorageConfig
 )
+from src.core.agentverse.agents.orchestrator_agent import OrchestratorAgent
 
 logger = logging.getLogger(__name__)
 
@@ -197,3 +198,203 @@ class EnvironmentService:
         invalid_caps = [cap for cap in capabilities if cap not in valid_capabilities]
         if invalid_caps:
             raise ValueError(f"Invalid capabilities: {', '.join(invalid_caps)}") 
+
+    async def execute_environment(
+        self, 
+        env_id: str, 
+        input_data: Dict[str, Any],
+        timeout: Optional[float] = None
+    ) -> Dict[str, Any]:
+        """Execute operations in the environment"""
+        env = await self.get_environment(env_id)
+        if env["status"] != "active":
+            raise ValueError("Environment must be active to execute operations")
+
+        try:
+            # Set environment to executing state
+            await self.repository.update(env_id, {
+                "status": "executing",
+                "updated_at": datetime.utcnow()
+            })
+
+            # Execute based on environment type
+            if env["type"] == "chat":
+                result = await self._execute_chat_environment(env, input_data)
+            elif env["type"] == "task":
+                result = await self._execute_task_environment(env, input_data)
+            else:
+                result = await self._execute_default_environment(env, input_data)
+
+            # Update environment status
+            await self.repository.update(env_id, {
+                "status": "active",
+                "updated_at": datetime.utcnow()
+            })
+
+            return result
+
+        except Exception as e:
+            # Set environment to error state
+            await self.repository.update(env_id, {
+                "status": "error",
+                "updated_at": datetime.utcnow(),
+                "metadata": {
+                    **env.get("metadata", {}),
+                    "last_error": str(e)
+                }
+            })
+            raise
+
+    async def get_environment_status(self, env_id: str) -> Dict[str, Any]:
+        """Get detailed environment status"""
+        env = await self.get_environment(env_id)
+        return {
+            "id": env["id"],
+            "status": env["status"],
+            "type": env["type"],
+            "last_updated": env.get("updated_at"),
+            "active_agents": await self._get_active_agents(env),
+            "active_tools": await self._get_active_tools(env),
+            "metrics": await self._get_environment_metrics(env),
+            "metadata": env.get("metadata", {})
+        }
+
+    async def _execute_chat_environment(
+        self, 
+        env: Dict[str, Any], 
+        input_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute chat environment operations"""
+        # Implement chat-specific execution
+        pass
+
+    async def _execute_task_environment(
+        self, 
+        env: Dict[str, Any], 
+        input_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute task environment operations"""
+        # Implement task-specific execution
+        pass
+
+    async def _execute_default_environment(
+        self, 
+        env: Dict[str, Any], 
+        input_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute default environment operations"""
+        # Implement default execution
+        pass 
+
+    async def _execute_orchestrated_environment(
+        self,
+        env: Dict[str, Any],
+        input_data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Execute environment using orchestrator agent"""
+        try:
+            # Get or create orchestrator agent
+            orchestrator = await self._get_orchestrator(env)
+            
+            # Analyze goal and select agents
+            requirements = await orchestrator.analyze_goal(input_data["goal"])
+            selected_agents = await orchestrator.select_agents(requirements)
+            
+            # Execute with coordination
+            result = await orchestrator.coordinate_execution(
+                input_data["goal"],
+                selected_agents,
+                input_data.get("context", {})
+            )
+            
+            return {
+                "orchestration": {
+                    "selected_agents": selected_agents,
+                    "requirements": requirements
+                },
+                "execution": result
+            }
+            
+        except Exception as e:
+            logger.error(f"Orchestration error: {str(e)}")
+            raise
+
+    async def _get_orchestrator(self, env: Dict[str, Any]) -> OrchestratorAgent:
+        """Get or create orchestrator agent for environment"""
+        # Initialize orchestrator with environment config
+        config = {
+            "llm": env["config"].get("llm_config", {}),
+            "orchestration": env["config"].get("orchestrator", {}),
+            "available_agents": await self._get_available_agents(env)
+        }
+        
+        return OrchestratorAgent(config) 
+
+    async def configure_orchestrator(
+        self,
+        env_id: str,
+        config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Configure orchestrator for an environment"""
+        env = await self.get_environment(env_id)
+        
+        # Validate agent roles and capabilities
+        for role, role_config in config["agent_roles"].items():
+            self._validate_capabilities(role_config["capabilities"])
+        
+        # Update environment config
+        update_data = {
+            "config": {
+                **env["config"],
+                "orchestrator": config,
+                "orchestration_enabled": True
+            },
+            "updated_at": datetime.utcnow()
+        }
+        
+        return await self.repository.update(env_id, update_data)
+
+    async def get_orchestrator_roles(self, env_id: str) -> List[Dict[str, Any]]:
+        """Get configured agent roles"""
+        env = await self.get_environment(env_id)
+        
+        if not env["config"].get("orchestrator"):
+            return []
+        
+        return [
+            {
+                "name": role,
+                **config
+            }
+            for role, config in env["config"]["orchestrator"]["agent_roles"].items()
+        ]
+
+    async def add_orchestrator_role(
+        self,
+        env_id: str,
+        role_name: str,
+        role_config: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Add or update an agent role"""
+        env = await self.get_environment(env_id)
+        
+        # Validate capabilities
+        self._validate_capabilities(role_config["capabilities"])
+        
+        # Update environment config
+        orchestrator_config = env["config"].get("orchestrator", {})
+        orchestrator_config["agent_roles"] = {
+            **orchestrator_config.get("agent_roles", {}),
+            role_name: role_config
+        }
+        
+        update_data = {
+            "config": {
+                **env["config"],
+                "orchestrator": orchestrator_config,
+                "orchestration_enabled": True
+            },
+            "updated_at": datetime.utcnow()
+        }
+        
+        return await self.repository.update(env_id, update_data) 
