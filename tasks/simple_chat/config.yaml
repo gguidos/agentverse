@@ -1,0 +1,31 @@
+name: simple_chat
+description: Simple chat interaction between assistant and user
+agents:
+  - type: assistant
+    name: helpful_ai
+    llm:
+      type: mock  # Using mock for testing
+      responses: [
+        "Hello! How can I help you today?",
+        "I'm an AI assistant. I can help with various tasks.",
+        "Let me know what you need help with!"
+      ]
+  - type: user
+    name: test_user
+    user_id: user123
+    llm:
+      type: mock
+      responses: [
+        "Hi!",
+        "Can you help me?",
+        "Thanks!"
+      ]
+
+environment:
+  type: chat
+  config:
+    name: chat_env
+    max_rounds: 5
+    context_window: 3
+
+max_steps: 10 

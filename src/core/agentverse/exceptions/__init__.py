@@ -1,7 +1,7 @@
-"""Exceptions Module"""
+"""Exceptions for AgentVerse"""
 
 class AgentVerseError(Exception):
-    """Base exception class"""
+    """Base exception for AgentVerse"""
     pass
 
 class ConfigError(AgentVerseError):
@@ -12,16 +12,20 @@ class AgentError(AgentVerseError):
     """Agent error"""
     pass
 
-class EnvironmentError(AgentVerseError):
-    """Environment error"""
-    pass
-
 class SimulationError(AgentVerseError):
     """Simulation error"""
     pass
 
-class TaskError(AgentVerseError):
-    """Task error"""
+class EnvironmentError(AgentVerseError):
+    """Environment error"""
+    pass
+
+class MemoryError(AgentVerseError):
+    """Memory operation error"""
+    pass
+
+class MemoryStorageError(AgentVerseError):
+    """Memory storage error"""
     pass
 
 class MessageBusError(AgentVerseError):
@@ -32,8 +36,9 @@ __all__ = [
     "AgentVerseError",
     "ConfigError",
     "AgentError",
-    "EnvironmentError",
     "SimulationError",
-    "TaskError",
+    "EnvironmentError",
+    "MemoryError",
+    "MemoryStorageError",
     "MessageBusError"
 ] 

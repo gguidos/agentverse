@@ -1,24 +1,24 @@
 name: simple_chat
-description: Simple chat between user and assistant
-max_rounds: 5
+description: Simple chat interaction between assistant and user
+agents:
+  - type: assistant
+    name: helpful_ai
+    llm:
+      type: openai  # or whatever LLM you're using
+      model: gpt-3.5-turbo
+      temperature: 0.7
+  - type: user
+    name: test_user
+    user_id: user123
+    llm:
+      type: mock  # For testing, use mock responses
+      responses: ["Hi!", "How can you help me?", "Thanks!"]
 
 environment:
   type: chat
-  message_bus:
-    type: in_memory
+  config:
+    name: chat_env
+    max_rounds: 5
+    context_window: 3
 
-agents:
-  - type: assistant
-    name: assistant_1
-    llm:
-      type: gpt3
-      model: gpt-3.5-turbo
-      temperature: 0.7
-    
-  - type: user
-    name: user_1
-    llm:
-      type: mock
-      responses:
-        - "Hello!"
-        - "How are you?" 
+max_steps: 10 

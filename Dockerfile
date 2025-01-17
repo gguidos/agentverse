@@ -19,6 +19,9 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt
 
+# Copy tasks directory
+COPY tasks /app/tasks
+
 # Stage 2: Create final image
 FROM python:3.12-slim
 
