@@ -3,14 +3,10 @@ from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from pydantic import BaseModel
 import logging
 import uuid
-from datetime import datetime
-
-from src.core.agentverse.factories import AgentFactory
 from src.core.agentverse.factories.agent import AgentFactoryConfig
 from src.core.dependencies.di_container import get_llm_service, get_agent_repository, get_agent_service
 from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
 from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
-from src.core.repositories.agent_repository import AgentRepository
 from src.core.services.agent_service import AgentService
 
 router = APIRouter()
@@ -70,6 +66,23 @@ async def create_agents(
             detail=f"Error creating agent: {str(e)}"
         )
 
+@router.get("/agent/types")
+async def list_agent_types(
+    agent_service: AgentService = Depends(get_agent_service)
+):
+    """List all agent types"""
+    try:
+        agent_types = await agent_service.list_agent_types()
+        return {
+            "agent_types": agent_types,
+            "count": len(agent_types)
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to list agent types: {str(e)}"
+        )
+    
 @router.post("/vector-store/{store_name}")
 async def create_vector_store(
     store_name: str,
@@ -131,24 +144,4 @@ async def update_agent(
         raise HTTPException(
             status_code=500,
             detail=f"Error updating agent: {str(e)}"
-        )
-
-@router.get("/tools")
-async def list_tools(
-    agent_service: AgentService = Depends(get_agent_service)
-):
-    """List all available tools"""
-    try:
-        tools = await agent_service.list_tools()
-        return {
-            "status": "success",
-            "data": {
-                "tools": tools
-            }
-        }
-    except Exception as e:
-        logger.error(f"Error listing tools: {str(e)}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error listing tools: {str(e)}"
         )

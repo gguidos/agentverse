@@ -197,3 +197,24 @@ class AgentService:
     async def list_tools(self) -> Dict[str, Any]:
         """Get all available tools and their schemas"""
         return tool_registry.list_tools() 
+
+    async def list_agent_types(self) -> List[Dict[str, Any]]:
+        """Get all registered agent types with their metadata
+        
+        Returns:
+            List of agent type information
+        """
+        from src.core.agentverse.registry import agent_registry
+        
+        agent_types = []
+        for agent_type, agent_class in agent_registry.get_registry().items():
+            agent_info = {
+                "type": agent_type,
+                "name": getattr(agent_class, 'name', agent_type),
+                "description": getattr(agent_class, 'description', None),
+                "version": getattr(agent_class, 'version', "1.0.0"),
+                "capabilities": getattr(agent_class, 'default_capabilities', [])
+            }
+            agent_types.append(agent_info)
+            
+        return agent_types 

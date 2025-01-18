@@ -57,6 +57,11 @@ class EvaluatorConfig(BaseModel):
 class EvaluatorAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
     """Enhanced evaluator agent"""
     
+    name = "evaluator"
+    description = "Agent that evaluates content and provides feedback"
+    version = "1.0.0"
+    default_capabilities = ["evaluate", "analyze", "provide_feedback"]
+    
     def __init__(
         self,
         config: EvaluatorConfig,

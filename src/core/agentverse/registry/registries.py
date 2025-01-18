@@ -1,4 +1,4 @@
-from typing import Dict, Type
+from typing import Dict
 import logging
 
 from src.core.agentverse.registry.base import Registry
@@ -12,10 +12,7 @@ from src.core.agentverse.environment.base import BaseEnvironment
 logger = logging.getLogger(__name__)
 
 # Agent registry
-agent_registry = AgentRegistry(
-    name="agent",
-    validate_components=True
-)
+agent_registry = AgentRegistry()
 
 # Memory registry
 memory_registry = Registry[BaseMemory](
