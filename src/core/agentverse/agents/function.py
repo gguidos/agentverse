@@ -9,12 +9,17 @@ import inspect
 from src.core.agentverse.agents.base_agent import BaseAgent
 from src.core.agentverse.message import Message, MessageType, MessageRole
 from src.core.agentverse.exceptions import AgentError
+from src.core.agentverse.registry import agent_registry 
 
 logger = logging.getLogger(__name__)
 
+@agent_registry.register("function")
 class FunctionAgent(BaseAgent):
     """Agent for executing functions"""
-    
+    name = "function"
+    description = "A specialized agent that executes predefined functions and handles function calls with arguments. It validates function permissions, manages function execution, and returns formatted responses."
+    version = "1.0.0"
+    default_capabilities = ["execute_function", "validate_args", "handle_errors"]
     def __init__(
         self,
         name: str,

@@ -9,7 +9,11 @@ from src.core.agentverse.message import Message
 @agent_registry.register("user")
 class UserAgent(BaseAgent):
     """User agent implementation"""
-    
+    name = "user"
+    description = "Agent that handles user messages"
+    version = "1.0.0"
+    default_capabilities = []
+
     def __init__(self, config: Dict[str, Any], llm: BaseLLM):
         super().__init__(name=config.get("name", "user"), llm=llm)
         self.user_id = config.get("user_id")

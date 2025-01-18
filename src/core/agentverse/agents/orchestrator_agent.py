@@ -1,7 +1,7 @@
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from src.core.agentverse.agents.base import BaseAgent
-from src.core.agentverse.tools import AgentCapability
+from src.core.agentverse.registry import agent_registry
 import logging
 
 logger = logging.getLogger(__name__)
@@ -12,6 +12,7 @@ class AgentRequirement(BaseModel):
     traits: Dict[str, Any] = {}
     priority: int = 1
 
+@agent_registry.register("orchestrator")
 class OrchestratorAgent(BaseAgent):
     """Agent that orchestrates other agents based on goals"""
     

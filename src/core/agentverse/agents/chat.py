@@ -7,12 +7,17 @@ from src.core.agentverse.message_bus import BaseMessageBus
 from src.core.agentverse.agents.mixins.memory_handler import MemoryHandlerMixin
 from src.core.agentverse.message import Message, MessageType
 from src.core.agentverse.memory import BaseMemory
-
+from src.core.agentverse.registry import agent_registry
 logger = logging.getLogger(__name__)
 
+@agent_registry.register("chat")
 class ChatAgent(BaseAgent, MessageHandlerMixin, MemoryHandlerMixin):
     """Chat agent with message and memory handling"""
-    
+    name = "chat"
+    description = "General purpose chat agent"
+    version = "1.0.0"
+    default_capabilities = []
+
     def __init__(
         self,
         config: AgentConfig,
