@@ -6,6 +6,8 @@ from pathlib import Path
 import mimetypes
 import logging
 from datetime import datetime
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.tools.types import AgentCapability, ToolType
 
 from src.core.agentverse.tools.base import (
     BaseTool, 
@@ -26,6 +28,7 @@ class FileToolConfig(ToolConfig):
     backup_files: bool = True
     requires_auth: bool = True
 
+@tool_registry.register(AgentCapability.FILE, ToolType.SIMPLE)
 class FileTool(BaseTool):
     """Tool for file operations"""
     

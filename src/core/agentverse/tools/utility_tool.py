@@ -4,9 +4,9 @@ import ast
 import math
 import json
 import yaml
-from datetime import datetime
-
 from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, ToolExecutionError
+from src.core.agentverse.tools.types import AgentCapability, ToolType
+from src.core.agentverse.tools.registry import tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class FormatToolConfig(ToolConfig):
     max_table_rows: int = 1000
     track_usage: bool = True
 
+@tool_registry.register(AgentCapability.CALCULATE, ToolType.SIMPLE)
 class CalculateTool(BaseTool):
     """Tool for safe mathematical calculations"""
     

@@ -8,60 +8,26 @@ import logging
 logger = logging.getLogger(__name__)
 
 class S3Client:
-    def __init__(self, region_name: str = None):
+    def __init__(self, region_name: str):
+        """Initialize S3 client"""
+        self.client = boto3.client('s3', region_name=region_name)
+        logger.debug(f"Initializing S3 client with region: {region_name}")
+        
+    def list_files(self, bucket: str, prefix: str = "") -> List[str]:
+        """List files in S3 bucket with given prefix"""
         try:
-            # Get credentials from environment
-            access_key = os.getenv('AWS_ACCESS_KEY_ID')
-            secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-            region = region_name or os.getenv('AWS_REGION', 'us-east-1')  # Default to us-east-1
-            
-            # Debug logging
-            logger.debug(f"Initializing S3 client with region: {region}")
-            logger.debug(f"Access key present: {bool(access_key)}")
-            logger.debug(f"Secret key present: {bool(secret_key)}")
-            
-            # Create client with explicit credentials and config
-            config = Config(
-                region_name=region,
-                signature_version='s3v4',
-                retries={'max_attempts': 3},
-                s3={'addressing_style': 'virtual'}  # Use virtual-hosted style addressing
-            )
-            
-            self.client = boto3.client(
-                's3',
-                aws_access_key_id=access_key,
-                aws_secret_access_key=secret_key,
-                region_name=region,
-                config=config
-            )
-            
-            # Test connection by listing buckets
-            self.client.list_buckets()
-            logger.info("Successfully initialized S3 client and verified credentials")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize S3 client: {str(e)}")
-            raise
-
-    def list_files(self, bucket_name: str, prefix: str = '') -> List[str]:
-        """List files in a bucket with an optional prefix (directory)"""
-        try:
-            # Ensure prefix ends with '/' if it's not empty
-            if prefix and not prefix.endswith('/'):
-                prefix = f"{prefix}/"
-
-            logger.debug(f"Listing files in bucket: {bucket_name} with prefix: {prefix}")
-            results = self.client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
+            paginator = self.client.get_paginator('list_objects_v2')
             files = []
-
-            if 'Contents' in results:
-                for obj in results['Contents']:
-                    files.append(obj['Key'])
+            
+            for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+                if 'Contents' in page:
+                    for obj in page['Contents']:
+                        files.append(obj['Key'])
+                        
             return files
             
-        except self.client.exceptions.ClientError as e:
-            logger.error(f"Error listing files in bucket {bucket_name}: {str(e)}")
+        except Exception as e:
+            logger.error(f"Error listing files from S3: {str(e)}")
             raise
 
     def get_file_metadata(self, bucket_name: str, key: str) -> Dict[str, str]:

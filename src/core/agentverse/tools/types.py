@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import Enum, auto
 from typing import Dict, Type, List
 from .base import BaseTool
 
@@ -10,7 +10,11 @@ class AgentCapability(str, Enum):
     SEARCH = "search"         # Complex tool, needs vectorstore
     MEMORY = "memory"         # Complex tool, needs memory store
     FILE_OPERATIONS = "file_operations"  # Complex tool, needs file system
-
+    KNOWLEDGE = "knowledge"
+    FILE = "file"
+    URL = "url"
+    FORM = "form"
+    
 class ToolType(str, Enum):
     """Tool types based on dependency requirements"""
     SIMPLE = "simple"

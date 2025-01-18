@@ -3,27 +3,34 @@ URL handling and validation tool
 """
 
 import logging
-from typing import Optional
+from typing import Optional, ClassVar, List
 import validators
 import httpx
 from pydantic import BaseModel, Field
-
+from src.core.agentverse.tools.types import AgentCapability, ToolType
+from src.core.agentverse.tools.registry import tool_registry
 from src.core.agentverse.exceptions import ToolError
+from src.core.agentverse.tools.base import BaseTool, ToolConfig
 
 logger = logging.getLogger(__name__)
-
-class URLToolConfig(BaseModel):
+    
+class URLToolConfig(ToolConfig):
     """Configuration for URL tool"""
     timeout: float = 10.0
     max_size: int = 1024 * 1024  # 1MB
     user_agent: str = "AgentVerse/1.0"
     follow_redirects: bool = True
 
-class URLTool:
-    """Tool for URL validation and fetching"""
+
+@tool_registry.register(AgentCapability.URL, ToolType.SIMPLE)
+class URLTool(BaseTool):
+    name: ClassVar[str] = "url"
+    description: ClassVar[str] = "Tool for URL validation and fetching"
+    version: ClassVar[str] = "1.0.0"
+    capabilities: ClassVar[List[str]] = [AgentCapability.URL]
     
     def __init__(self, config: Optional[URLToolConfig] = None):
-        self.config = config or URLToolConfig()
+        super().__init__(config=config or URLToolConfig())
         self.client = httpx.AsyncClient(
             timeout=self.config.timeout,
             follow_redirects=self.config.follow_redirects,

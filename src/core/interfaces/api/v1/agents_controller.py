@@ -89,9 +89,38 @@ async def create_vector_store(
     file: UploadFile = File(...),
     orchestrator: VectorstoreOrchestratorService = Depends(get_vectorstore_orchestrator)
 ):
-    logger.info("Creating vector store")
-    result = await orchestrator.process_file(file, store_name)
-    return result
+    """Create a new vector store from file"""
+    try:
+        logger.info(f"Creating vector store '{store_name}' from file {file.filename}")
+        
+        # Validate file content
+        content = await file.read()
+        if not content:
+            raise HTTPException(
+                status_code=400,
+                detail="Empty file content"
+            )
+        
+        # Reset file position after validation
+        await file.seek(0)
+        
+        # Process file and create vectorstore
+        result = await orchestrator.process_file(file, store_name)
+        
+        return {
+            "status": "success",
+            "data": result,
+            "message": f"Vector store '{store_name}' created successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating vector store: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create vector store: {str(e)}"
+        )
 
 @router.get("/agents")
 @router.get("/agents/")

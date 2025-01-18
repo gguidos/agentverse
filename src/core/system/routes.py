@@ -7,13 +7,15 @@ from src.core.interfaces.api.v1.tools_controller import router as tools_router
 from src.core.interfaces.api.v1.environments_controller import router as environments_router
 from src.core.interfaces.api.v1.environment_orchestration_controller import router as env_orchestration_router
 from src.core.interfaces.api.v1.orchestrator_controller import router as orchestrator_router
+from src.core.interfaces.api.v1.vectorstore_controller import router as vectorstore_router
 
 def register_routers(app, container):
     # Wire the container to the modules that use the dependencies
     container.wire(modules=[
         "src.app.interfaces.api.v1.controller",
         "src.core.interfaces.api.v1.agents_controller",
-        "src.core.interfaces.api.v1.simulation_controller"
+        "src.core.interfaces.api.v1.simulation_controller",
+        "src.core.interfaces.api.v1.vectorstore_controller"
     ])
 
     # Include routers
@@ -26,3 +28,4 @@ def register_routers(app, container):
     app.include_router(environments_router, prefix="/api/v1", tags=["environments"])
     app.include_router(env_orchestration_router, prefix="/api/v1", tags=["environment-orchestration"])
     app.include_router(orchestrator_router, prefix="/api/v1", tags=["orchestrator"])
+    app.include_router(vectorstore_router, prefix="/api/v1", tags=["vectorstore"])

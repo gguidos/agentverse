@@ -34,6 +34,7 @@ class SearchTool(BaseTool):
     Supports multiple collections, result reranking, and context combination.
     """
     version: ClassVar[str] = "1.1.0"
+    capabilities: ClassVar[List[str]] = ["search"]
     parameters: ClassVar[Dict[str, Any]] = {
         "query": {
             "type": "string",

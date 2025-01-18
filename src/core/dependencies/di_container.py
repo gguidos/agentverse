@@ -27,6 +27,14 @@ from src.core.agentverse.memory.agent_memory import AgentMemoryStore
 from src.core.services.tool_service import ToolService
 from src.core.services.environment_service import EnvironmentService
 from src.core.repositories.environment_repository import EnvironmentRepository
+import os
+import logging
+from langchain_community.vectorstores import Chroma
+from langchain.embeddings.base import Embeddings
+from src.core.infrastructure.vectorstore.chroma_client import ChromaClient
+from src.core.infrastructure.aws.get_embedings import GetEmbeddings
+
+logger = logging.getLogger(__name__)
 
 class Container(containers.DeclarativeContainer):
     config = providers.Configuration()
@@ -71,27 +79,35 @@ class Container(containers.DeclarativeContainer):
 
     openai_service = providers.Singleton(OpenAIService)
 
-    embeddings_client = providers.Singleton(
+    # Add embeddings configuration
+    config.embeddings.from_dict({
+        "model": "text-embedding-ada-002",
+        "api_key": os.getenv("OPENAI_API_KEY")
+    })
+
+    # Update embeddings client
+    embeddings_client = providers.Factory(
         GetEmbeddings
     )
 
-    split_document_client = providers.Singleton(
+    split_document_client = providers.Factory(
         SplitDocument
     )
 
-    calculate_chunk_ids_client = providers.Singleton(
+    calculate_chunk_ids_client = providers.Factory(
         CalculateChunkIds
     )
 
-    chroma_db_client = providers.Singleton(
-        ChromaDB,
-        embeddings_client=embeddings_client,
-        chroma_path=config.chroma_path
+    # ChromaDB client
+    chroma_client = providers.Singleton(
+        ChromaClient,
+        embedding_function=embeddings_client
     )
 
-    indexing_service = providers.Singleton(
+    # Indexing service
+    indexing_service = providers.Factory(
         IndexingService,
-        chroma_db=chroma_db_client,
+        chroma_db=chroma_client,
         split_document=split_document_client,
         calculate_chunk_ids=calculate_chunk_ids_client,
         embeddings_client=embeddings_client
@@ -163,11 +179,11 @@ class Container(containers.DeclarativeContainer):
         max_tokens=config.llm.max_tokens
     )
 
-    # Vector store dependencies
+    # Update vectorstore service
     vectorstore_service = providers.Factory(
         VectorstoreService,
-        embedding_service=embedding_service,
-        chroma_db=chroma_db_client
+        embedding_service=embeddings_client,
+        chroma_db=chroma_client
     )
 
     # Memory store dependencies

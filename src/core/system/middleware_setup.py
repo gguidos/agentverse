@@ -3,8 +3,10 @@ from src.core.middleware.logging_middleware import LoggingMiddleware
 from src.core.middleware.response_interceptor import ResponseFormatMiddleware
 from src.core.middleware.security_headers import SecurityHeadersMiddleware
 from src.core.middleware.request_id_middleware import RequestIDMiddleware
+from src.core.infrastructure.middleware.error_logging_middleware import ErrorLoggingMiddleware
 
 def add_middlewares(app):
+    app.add_middleware(ErrorLoggingMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],  # Allow all origins for development

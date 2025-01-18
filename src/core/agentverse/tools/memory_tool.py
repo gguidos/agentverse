@@ -29,6 +29,11 @@ class MemoryTool(BaseTool):
     Supports semantic search, context retrieval, and memory summarization.
     """
     version: ClassVar[str] = "1.1.0"
+    capabilities: ClassVar[List[str]] = [AgentCapability.MEMORY]
+    required_dependencies = {
+        "memory_store": "MemoryStore",
+        "llm": "BaseLLM"
+    }
     parameters: ClassVar[Dict[str, Any]] = {
         "operation": {
             "type": "string",

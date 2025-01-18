@@ -3,12 +3,25 @@ from typing import List, Dict, Any
 from pydantic import BaseModel, Field
 
 class EvaluationStyle(Enum):
-    SKEPTIC = "skeptic"        # Questions everything, high bar for acceptance
-    OPTIMISTIC = "optimistic"  # Focuses on positives, sees potential
-    REALISTIC = "realistic"    # Balanced view, evidence-based
-    CRITICAL = "critical"      # Focuses on finding flaws
-    NEUTRAL = "neutral"        # Purely objective, no bias
-    CONSTRUCTIVE = "constructive"  # Focuses on improvement opportunities
+    SKEPTIC = "skeptic"
+    OPTIMISTIC = "optimistic"
+    REALISTIC = "realistic"
+    CRITICAL = "critical"
+    NEUTRAL = "neutral"
+    CONSTRUCTIVE = "constructive"
+
+class FocusArea(Enum):
+    ACCURACY = "accuracy"
+    LOGIC = "logic"
+    EVIDENCE = "evidence"
+    CONSISTENCY = "consistency"
+    RELEVANCE = "relevance"
+    BIAS = "bias"
+
+class BiasType(Enum):
+    CONFIRMATION = "confirmation"
+    RECENCY = "recency"
+    AUTHORITY = "authority"
 
 class EvaluatorTraits(BaseModel):
     """Configuration for evaluator personality traits"""
@@ -19,11 +32,11 @@ class EvaluatorTraits(BaseModel):
         le=1.0,
         description="Threshold for accepting statements as true"
     )
-    bias_factors: Dict[str, float] = Field(
+    bias_factors: Dict[BiasType, float] = Field(
         default_factory=dict,
         description="Specific biases and their strengths (0.0 to 1.0)"
     )
-    focus_areas: List[str] = Field(
+    focus_areas: List[FocusArea] = Field(
         default_factory=list,
         description="Areas to pay special attention to"
     )

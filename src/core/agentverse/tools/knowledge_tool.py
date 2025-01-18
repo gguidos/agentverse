@@ -19,6 +19,8 @@ from plotly.subplots import make_subplots
 from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, ToolExecutionError
 from src.core.agentverse.llm.base import BaseLLM
 from src.core.agentverse.memory.vectorstore import VectorstoreService
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.tools.types import AgentCapability, ToolType
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +33,7 @@ class KnowledgeToolConfig(ToolConfig):
     max_results: int = 50
     clustering_min_docs: int = 5
 
+@tool_registry.register(AgentCapability.KNOWLEDGE, ToolType.COMPLEX)
 class KnowledgeTool(BaseTool):
     """Tool for searching and analyzing knowledge base"""
     
@@ -40,6 +43,13 @@ class KnowledgeTool(BaseTool):
     Supports search, QA, summarization, topic extraction, and visualization.
     """
     version: ClassVar[str] = "1.1.0"
+    capabilities: ClassVar[List[str]] = [AgentCapability.KNOWLEDGE]
+    required_dependencies = {
+        "vectorstore": "VectorstoreService",
+        "llm": "BaseLLM",
+        "redis_client": "Redis"
+    }
+    
     parameters: ClassVar[Dict[str, Any]] = {
         "operation": {
             "type": "string",

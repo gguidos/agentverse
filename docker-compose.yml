@@ -24,9 +24,11 @@ services:
       - DATA_DIR=${DATA_DIR}
       - CHROMA_PATH=${CHROMA_PATH}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - VECTORSTORE_PATH=/app/indexes
     volumes:
       - .:/app
       - ./tasks:/app/tasks
+      - vectorstore_data:/app/indexes
     ports:
       - "8000:8000"
     depends_on:
@@ -35,6 +37,7 @@ services:
       - redis
     networks:
       - monitoring
+      - agentverse-network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 30s
@@ -86,7 +89,10 @@ services:
 
 volumes:
   mongodb_data:
+  vectorstore_data:
 
 networks:
   monitoring:
+    driver: bridge
+  agentverse-network:
     driver: bridge

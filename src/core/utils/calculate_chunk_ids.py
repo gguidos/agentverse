@@ -1,34 +1,24 @@
+import hashlib
+from typing import List
 import logging
+
 logger = logging.getLogger(__name__)
 
 class CalculateChunkIds:
-    def __init__(self):
-        pass
-
-    def calculate_chunk_ids(self, chunks):
-        logger.debug("calculate_chunks")
-        # This will create IDs like "data/monopoly.pdf:6:2"
-        # Page Source : Page Number : Chunk Index
-
-        last_page_id = None
-        current_chunk_index = 0
-
-        for chunk in chunks:
-            source = chunk.metadata.get("source")
-            page = chunk.metadata.get("page")
-            current_page_id = f"{source}:{page}"
-
-            # If the page ID is the same as the last one, increment the index.
-            if current_page_id == last_page_id:
-                current_chunk_index += 1
-            else:
-                current_chunk_index = 0
-
-            # Calculate the chunk ID.
-            chunk_id = f"{current_page_id}:{current_chunk_index}"
-            last_page_id = current_page_id
-
-            # Add it to the page meta-data.
-            chunk.metadata["id"] = chunk_id
-
-        return chunks
+    """Calculate unique IDs for document chunks"""
+    
+    def calculate(self, chunks: List[str]) -> List[str]:
+        """Calculate unique IDs for each chunk based on content hash"""
+        try:
+            chunk_ids = []
+            for chunk in chunks:
+                # Create SHA-256 hash of chunk content
+                chunk_hash = hashlib.sha256(chunk.encode()).hexdigest()
+                chunk_ids.append(chunk_hash)
+                
+            logger.debug(f"Generated {len(chunk_ids)} chunk IDs")
+            return chunk_ids
+            
+        except Exception as e:
+            logger.error(f"Error calculating chunk IDs: {str(e)}")
+            raise
