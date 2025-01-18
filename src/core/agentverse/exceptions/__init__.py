@@ -1,94 +1,148 @@
-"""AgentVerse exceptions"""
+"""
+AgentVerse Exceptions Module
 
-from typing import Optional, Dict, Any
+This module defines custom exceptions used throughout the AgentVerse system.
+"""
 
 class AgentVerseError(Exception):
-    """Base exception for AgentVerse errors"""
-    def __init__(self, message: str, details: Optional[Dict[str, Any]] = None):
-        super().__init__(message)
+    """Base exception for all AgentVerse errors"""
+    pass
+
+class ConfigurationError(AgentVerseError):
+    """Raised when there is an error in configuration"""
+    
+    def __init__(self, message: str, config_key: str = None, details: dict = None):
         self.message = message
+        self.config_key = config_key
         self.details = details or {}
+        super().__init__(self.message)
 
-class ConfigError(AgentVerseError):
-    """Configuration error"""
-    pass
+    def __str__(self):
+        error_msg = self.message
+        if self.config_key:
+            error_msg = f"{error_msg} (key: {self.config_key})"
+        if self.details:
+            error_msg = f"{error_msg} - details: {self.details}"
+        return error_msg
 
-class LLMError(AgentVerseError):
-    """LLM operation error"""
-    pass
+# Backwards compatibility
+ConfigError = ConfigurationError
 
+# Registry Exceptions
 class RegistrationError(AgentVerseError):
-    """Registration error"""
+    """Raised when there is an error registering components"""
     pass
 
 class ComponentNotFoundError(AgentVerseError):
-    """Component not found error"""
+    """Raised when a requested component is not found in registry"""
     pass
 
-class ParserError(AgentVerseError):
-    """Parser error"""
+# Validation Exceptions
+class ValidationError(AgentVerseError):
+    """Raised when validation fails"""
     pass
 
-class ActionError(AgentVerseError):
-    """Action execution error"""
-    pass
-
-class AgentStateError(AgentVerseError):
-    """Agent state error"""
-    pass
-
-class SimulationError(AgentVerseError):
-    """Simulation execution error"""
-    pass
-
-class EnvironmentError(AgentVerseError):
-    """Environment error"""
-    pass
-
-class ToolError(AgentVerseError):
-    """Exception raised by tools during execution"""
-    pass
-
-class MessageBusError(AgentVerseError):
-    """Exception raised by message bus operations"""
-    pass
-
+# Agent Exceptions
 class AgentError(AgentVerseError):
-    """Exception raised by agent operations"""
+    """Raised when there is an error with an agent"""
     pass
 
-class FactoryError(AgentVerseError):
-    """Exception raised during object creation"""
+class AgentStateError(AgentError):
+    """Raised when there is an error with agent state"""
     pass
 
+# Tool Exceptions
+class ToolError(AgentVerseError):
+    """Raised when there is an error with a tool"""
+    pass
+
+# Memory Exceptions
 class MemoryError(AgentVerseError):
-    """Memory operation error"""
+    """Base exception for memory-related errors"""
     pass
 
-class MemoryStorageError(AgentVerseError):
-    """Memory storage error"""
+class MemoryStorageError(MemoryError):
+    """Raised when there is an error with memory storage operations"""
     pass
 
-class MemoryManipulationError(AgentVerseError):
-    """Memory manipulation error"""
+class MemoryManipulationError(MemoryError):
+    """Raised when there is an error manipulating memory contents"""
     pass
 
+# LLM Exceptions
+class LLMError(AgentVerseError):
+    """Raised when there is an error with LLM operations"""
+    pass
+
+# Parser Exceptions
+class ParserError(AgentVerseError):
+    """Raised when there is an error parsing content"""
+    pass
+
+# Communication Exceptions
+class MessageBusError(AgentVerseError):
+    """Raised when there is an error with message bus operations"""
+    pass
+
+# Factory Exceptions
+class FactoryError(AgentVerseError):
+    """Raised when there is an error in factory operations"""
+    pass
+
+# Environment Exceptions
+class EnvironmentError(AgentVerseError):
+    """Raised when there is an error with the environment"""
+    pass
+
+# Action Exceptions
+class ActionError(AgentVerseError):
+    """Raised when there is an error executing an action"""
+    pass
+
+class ActionValidationError(ActionError):
+    """Raised when action validation fails"""
+    pass
+
+class ActionExecutionError(ActionError):
+    """Raised when action execution fails"""
+    pass
+
+# Simulation Exceptions
+class SimulationError(AgentVerseError):
+    """Raised when there is an error in simulation execution"""
+    pass
+
+class SimulationStateError(SimulationError):
+    """Raised when there is an error with simulation state"""
+    pass
+
+class SimulationConfigError(SimulationError):
+    """Raised when there is an error with simulation configuration"""
+    pass
+
+# Export all exception classes
 __all__ = [
     "AgentVerseError",
+    "ConfigurationError",
     "ConfigError",
-    "LLMError",
     "RegistrationError",
     "ComponentNotFoundError",
-    "ParserError",
-    "ActionError",
-    "AgentStateError",
-    "SimulationError",
-    "EnvironmentError",
-    "ToolError",
-    "MessageBusError",
+    "ValidationError",
     "AgentError",
-    "FactoryError",
+    "AgentStateError",
+    "ActionError",
+    "ActionValidationError",
+    "ActionExecutionError",
+    "ToolError",
     "MemoryError",
     "MemoryStorageError",
-    "MemoryManipulationError"
+    "MemoryManipulationError",
+    "LLMError",
+    "ParserError",
+    "MessageBusError",
+    "FactoryError",
+    "EnvironmentError",
+    "SimulationError",
+    "SimulationStateError",
+    "SimulationConfigError"
 ] 

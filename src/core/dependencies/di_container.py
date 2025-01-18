@@ -33,6 +33,9 @@ from langchain_community.vectorstores import Chroma
 from langchain.embeddings.base import Embeddings
 from src.core.infrastructure.vectorstore.chroma_client import ChromaClient
 from src.core.infrastructure.aws.get_embedings import GetEmbeddings
+from src.core.services.memory_service import MemoryService
+from src.core.services.parser_service import ParserService
+from src.core.agentverse.tools import ToolRegistry, tool_registry
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +198,7 @@ class Container(containers.DeclarativeContainer):
 
     # Tool registry with only required dependencies for simple tools
     tool_registry = providers.Singleton(
-        register_default_tools
+        ToolRegistry
     )
 
     agent_service = providers.Factory(
@@ -219,6 +222,7 @@ class Container(containers.DeclarativeContainer):
         environment_repository=environment_repository
     )
 
+# First define the basic service getters
 async def get_llm_service() -> Any:
     """Get LLM service instance"""
     container = Container()
@@ -228,15 +232,34 @@ async def get_llm_service() -> Any:
         **llm_config
     )
 
+async def get_memory_service() -> MemoryService:
+    """Get memory service instance"""
+    return MemoryService()
+
+async def get_parser_service() -> ParserService:
+    """Get parser service instance"""
+    return ParserService()
+
 async def get_agent_repository() -> AgentRepository:
     """Get agent repository instance"""
     container = Container()
     return container.agent_repository()
 
-async def get_agent_service() -> AgentService:
+# Then define services that depend on the basic ones
+async def get_agent_service(
+    agent_repository: AgentRepository = Depends(get_agent_repository),
+    llm_service: Any = Depends(get_llm_service),
+    memory_service: MemoryService = Depends(get_memory_service),
+    parser_service: ParserService = Depends(get_parser_service)
+) -> AgentService:
     """Get agent service instance"""
-    container = Container()
-    return container.agent_service()
+    return AgentService(
+        agent_repository=agent_repository,
+        tool_registry=tool_registry,  # Use singleton directly
+        llm_service=llm_service,
+        memory_service=memory_service,
+        parser_service=parser_service
+    )
 
 async def get_tool_service() -> ToolService:
     """Get tool service instance"""
@@ -247,4 +270,10 @@ async def get_environment_service() -> EnvironmentService:
     """Get environment service instance"""
     container = Container()
     return container.environment_service()
+
+async def get_tool_registry() -> ToolRegistry:
+    """Get tool registry instance"""
+    container = Container()
+    # Use the singleton tool registry or create a new one
+    return container.tool_registry() or tool_registry
 

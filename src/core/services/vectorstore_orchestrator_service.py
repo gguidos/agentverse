@@ -69,42 +69,31 @@ class VectorstoreOrchestratorService:
         """List all vector stores"""
         try:
             logger.debug("Attempting to list vector stores")
-            
-            # Get list of buckets
-            bucket_name = os.getenv('AWS_DOCUMENTS_BUCKET')
-            if not bucket_name:
-                logger.error("AWS_DOCUMENTS_BUCKET environment variable is not set")
-                raise ValueError("AWS_DOCUMENTS_BUCKET environment variable is not set")
-            
-            logger.debug(f"Using bucket: {bucket_name}")
-            
-            # List directories (stores) in the bucket
             stores = []
+            
+            # Get ChromaDB collections
             try:
-                # Get list of "directories" from S3
-                prefixes = await self.upload_service.list_stores()
-                logger.debug(f"Found stores: {prefixes}")
+                collections = await self.indexing_service.list_collections()
+                logger.info(f"Orchestrator - Found collections: {collections}")
                 
-                for prefix in prefixes:
-                    store_info = {
-                        "name": prefix.rstrip('/'),
-                        "document_count": await self.get_store_document_count(prefix)
-                    }
-                    stores.append(store_info)
-                    
-                logger.debug(f"Processed store information: {stores}")
-                return stores
-                
+                if collections:  # Add this check
+                    for collection in collections:
+                        store_info = {
+                            "name": collection,
+                            "document_count": 0  # For now, set a default
+                        }
+                        stores.append(store_info)
+                        logger.info(f"Added store info: {store_info}")
             except Exception as e:
-                logger.error(f"Error listing stores from S3: {str(e)}", exc_info=True)
-                raise
-                
+                logger.error(f"Error listing ChromaDB collections: {str(e)}")
+                raise  # Make sure we raise the error
+            
+            logger.info(f"Final stores list: {stores}")
+            return stores
+            
         except Exception as e:
             logger.error(f"Error listing vector stores: {str(e)}", exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Failed to list vector stores: {str(e)}"
-            )
+            raise
 
     async def get_store_document_count(self, store_prefix: str) -> int:
         """Get the number of documents in a store"""

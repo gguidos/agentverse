@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
 from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
 import logging
+from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -38,23 +39,24 @@ async def create_vector_store(
         )
 
 @router.get("/vector-store", tags=["vectorstore"])
-async def list_vector_stores(
+async def list_vectorstores(
     orchestrator: VectorstoreOrchestratorService = Depends(get_vectorstore_orchestrator)
-):
+) -> Dict[str, Any]:
     """List all vector stores"""
     try:
         stores = await orchestrator.list_stores()
+        logger.info(f"Controller - Found stores: {stores}")
         return {
             "status": "success",
             "data": stores,
             "message": "Vector stores retrieved successfully"
         }
     except Exception as e:
-        logger.error(f"Error listing vector stores: {str(e)}", exc_info=True)
+        logger.error(f"Error listing vector stores: {str(e)}")
         raise HTTPException(
             status_code=500,
             detail=f"Failed to list vector stores: {str(e)}"
-        ) 
+        )
 
 @router.get("/vector-store/{store_name}", tags=["vectorstore"])
 async def get_vector_store(

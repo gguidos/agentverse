@@ -10,20 +10,41 @@ from src.core.agentverse.tools import (
     tool_registry,
     ToolRegistry
 )
+from src.core.agentverse.factories.agent_factory import AgentFactory, AgentConfig
 import logging
+import uuid
 
 logger = logging.getLogger(__name__)
 
 class AgentService:
-    def __init__(self, agent_repository: AgentRepository, tool_registry: ToolRegistry = None):
+    def __init__(
+        self, 
+        agent_repository: AgentRepository, 
+        tool_registry: ToolRegistry = None,
+        llm_service: Any = None,
+        memory_service: Any = None,
+        parser_service: Any = None
+    ):
         """Initialize agent service
         
         Args:
             agent_repository: Repository for agent persistence
             tool_registry: Optional tool registry instance
+            llm_service: LLM service for agent creation
+            memory_service: Memory service for agent creation
+            parser_service: Parser service for agent creation
         """
         self.repository = agent_repository
-        self.tool_registry = tool_registry or tool_registry  # Use provided or singleton
+        self.tool_registry = tool_registry
+        
+        # Initialize agent factory
+        self.factory = AgentFactory(
+            llm_service=llm_service,
+            memory_service=memory_service,
+            parser_service=parser_service,
+            available_tools={},  # Start with empty tools
+            default_memory_class=None
+        )
         
     async def check_exists(self, name: str, type: str) -> bool:
         """Check if agent with same name and type exists"""
@@ -46,34 +67,53 @@ class AgentService:
                 raise ValueError(f"Invalid capability: {cap}")
         return valid_capabilities
 
-    async def create_agent(self, config: AgentFactoryConfig, llm_service: Any) -> Dict[str, Any]:
+    async def create_agent(self, config_data: Dict[str, Any], llm_service: Any) -> Dict[str, Any]:
         """Create and persist a new agent"""
-        # Check for duplicates first
-        if await self.check_exists(config.name, config.type):
-            raise ValueError(f"Agent with name '{config.name}' and type '{config.type}' already exists")
+        try:
+            # Check for duplicates first
+            if await self.check_exists(config_data["name"], config_data["type"]):
+                raise ValueError(f"Agent with name '{config_data['name']}' and type '{config_data['type']}' already exists")
             
-        # Validate capabilities first
-        config.capabilities = self.validate_capabilities(config.capabilities)
-        
-        # Create agent using factory
-        agent = await AgentFactory.create(
-            config=config,
-            llm_service=llm_service
-        )
-        
-        # Prepare data for storage
-        agent_data = {
-            "id": agent.config.id,
-            "name": agent.config.name,
-            "type": agent.config.type,
-            "capabilities": agent.config.capabilities,
-            "metadata": agent.config.metadata,
-            "created_at": datetime.utcnow()
-        }
-        
-        # Store in database
-        await self.repository.create(agent_data)
-        return agent
+            # Generate agent ID
+            agent_id = str(uuid.uuid4())
+            
+            # Validate capabilities first
+            validated_capabilities = self.validate_capabilities(config_data["capabilities"])
+            
+            # Create agent config
+            agent_config = AgentConfig(
+                name=config_data["name"],
+                capabilities=validated_capabilities,
+                metadata={
+                    "id": agent_id,  # Add the ID to metadata
+                    "type": config_data["type"],
+                    "llm_config": config_data.get("llm_config", {}),
+                    "form_config": config_data.get("form_config", {})
+                }
+            )
+            
+            # Create agent using factory
+            agent = await self.factory.get_agent(
+                agent_id=agent_id,  # Pass the generated ID
+                config=agent_config
+            )
+            
+            # Prepare data for storage
+            agent_data = {
+                "id": agent_id,  # Use the generated ID
+                "name": agent.name,
+                "type": config_data["type"],
+                "capabilities": [cap.value for cap in validated_capabilities],
+                "metadata": agent.metadata,
+                "created_at": datetime.utcnow()
+            }
+            
+            # Store in database
+            await self.repository.create(agent_data)
+            return agent_data
+        except Exception as e:
+            logger.error(f"Error creating agent: {str(e)}")
+            raise ValueError(f"Invalid agent configuration: {str(e)}")
         
     async def list_agents(self) -> Dict[str, Any]:
         """Get all agents"""

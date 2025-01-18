@@ -7,6 +7,7 @@ from src.core.agentverse.agents.base_agent import BaseAgent
 from src.core.agentverse.tools.base import BaseTool
 from src.core.agentverse.memory.base import BaseMemory
 from src.core.agentverse.exceptions import ConfigurationError
+from src.core.agentverse.agents.form_interviewer import FormInterviewerAgent
 
 logger = logging.getLogger(__name__)
 
@@ -248,3 +249,26 @@ class AgentFactory:
         self._agents.clear()
         self.metrics = AgentMetrics()
         logger.info(f"Reset {self.name}") 
+    
+    async def get_agent(self, agent_id: str, config: AgentConfig) -> BaseAgent:
+        """Create agent instance based on type"""
+        try:
+            agent_type = config.metadata.get("type")
+            
+            if agent_type == "form_interviewer":
+                agent = FormInterviewerAgent(
+                    name=config.name,
+                    llm=self.llm_service,
+                    memory=self.memory_service,
+                    parser=self.parser_service,
+                    prompt_template=config.prompt_template,
+                    tools=self.available_tools,
+                    metadata=config.metadata
+                )
+                await agent.initialize()  # Add initialization if needed
+                return agent
+            
+            raise ValueError(f"Unknown agent type: {agent_type}")
+        except Exception as e:
+            logger.error(f"Error creating agent: {str(e)}")
+            raise 

@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from pydantic import BaseModel
+from json import JSONEncoder
 import logging
 import uuid
 from src.core.agentverse.factories.agent import AgentFactoryConfig
@@ -8,6 +9,8 @@ from src.core.dependencies.di_container import get_llm_service, get_agent_reposi
 from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
 from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
 from src.core.services.agent_service import AgentService
+from fastapi.encoders import jsonable_encoder
+from bson import ObjectId
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -26,44 +29,29 @@ class UpdateAgentRequest(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
 
 @router.post("/agents")
-async def create_agents(
-    request: CreateAgentRequest,
-    llm_service = Depends(get_llm_service),
-    agent_service: AgentService = Depends(get_agent_service)
-):
+async def create_agent(
+    config: Dict[str, Any],
+    agent_service: AgentService = Depends(get_agent_service),
+    llm_service: Any = Depends(get_llm_service)
+) -> Dict[str, Any]:
     """Create a new agent"""
     try:
-        config = AgentFactoryConfig(
-            id=str(uuid.uuid4()),
-            type=request.type,
-            name=request.name,
-            capabilities=request.capabilities,
-            llm=request.llm_config,
-            metadata=request.metadata
-        )
-        
+        # Create agent
         agent = await agent_service.create_agent(config, llm_service)
+        
+        # Convert response to JSON-serializable format
+        serialized_agent = jsonable_encoder(agent, custom_encoder={ObjectId: str})
         
         return {
             "status": "success",
-            "data": {
-                "id": agent.config.id,
-                "name": agent.config.name,
-                "type": agent.config.type,
-                "capabilities": agent.config.capabilities
-            }
+            "data": serialized_agent,
+            "message": "Agent created successfully"
         }
-    except ValueError as e:
-        logger.error(f"Invalid agent configuration: {str(e)}")
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid agent configuration: {str(e)}"
-        )
     except Exception as e:
         logger.error(f"Error creating agent: {str(e)}")
         raise HTTPException(
-            status_code=500,
-            detail=f"Error creating agent: {str(e)}"
+            status_code=400,
+            detail=f"Invalid agent configuration: {str(e)}"
         )
 
 @router.get("/agent/types")

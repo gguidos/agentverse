@@ -84,3 +84,14 @@ class ChromaClient:
         except Exception as e:
             logger.error(f"Error getting collection {collection_name}: {str(e)}")
             return None 
+
+    async def list_collections(self) -> List[str]:
+        """List all collections"""
+        try:
+            # In ChromaDB v0.6.0, list_collections() returns collection names directly
+            collections = self.client.list_collections()
+            logger.info(f"Found ChromaDB collections: {collections}")
+            return collections  # Already a list of strings
+        except Exception as e:
+            logger.error(f"Error listing collections: {str(e)}")
+            raise 

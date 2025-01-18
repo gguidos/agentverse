@@ -83,3 +83,13 @@ class IndexingService:
         except Exception as e:
             logger.error(f"Error getting collection info: {str(e)}")
             raise
+
+    async def list_collections(self) -> List[str]:
+        """List all collections in ChromaDB"""
+        try:
+            collections = await self.chroma_db.list_collections()
+            logger.info(f"IndexingService - Found collections: {collections}")
+            return collections
+        except Exception as e:
+            logger.error(f"Error listing collections: {str(e)}")
+            raise
