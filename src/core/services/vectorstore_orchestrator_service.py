@@ -54,7 +54,7 @@ class VectorstoreOrchestratorService:
             await self.indexing_service.index_documents(store_name, [temp_file_path])  # Changed this line
             
             # # Upload to S3
-            # await self.upload_service.upload(temp_file_path, file.filename, store_name)
+            await self.upload_service.upload(temp_file_path, file.filename, store_name)
             
         except Exception as e:
             logger.error(f"Error in file processing: {str(e)}")
