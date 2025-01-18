@@ -2,7 +2,7 @@ from typing import Dict, Type, Any, Optional, List
 from pydantic import BaseModel, Field
 import logging
 from .base import BaseTool, ToolConfig
-from .types import SIMPLE_TOOLS, COMPLEX_TOOLS
+from .types import AgentCapability, ToolType, SIMPLE_TOOLS, COMPLEX_TOOLS
 
 logger = logging.getLogger(__name__)
 
@@ -25,39 +25,34 @@ class ToolRegistry(BaseModel):
         "arbitrary_types_allowed": True
     }
     
-    def register(self, *names: str, config: Optional[ToolConfig] = None):
-        """Register a tool class with multiple names
+    def register(self, capability: AgentCapability, tool_type: str = ToolType.SIMPLE):
+        """Register a tool class decorator
         
         Args:
-            *names: Tool names to register
-            config: Optional tool configuration
+            capability: Tool capability
+            tool_type: Tool type (simple or complex)
         """
         def decorator(tool_class: Type[BaseTool]):
-            # Validate tool class
-            if not issubclass(tool_class, BaseTool):
-                raise ValueError(f"Class {tool_class.__name__} must inherit from BaseTool")
+            # Register in capability collections
+            if tool_type == ToolType.SIMPLE:
+                if capability not in SIMPLE_TOOLS:
+                    SIMPLE_TOOLS[capability] = []
+                SIMPLE_TOOLS[capability].append(tool_class)
+            else:
+                if capability not in COMPLEX_TOOLS:
+                    COMPLEX_TOOLS[capability] = []
+                COMPLEX_TOOLS[capability].append(tool_class)
             
-            # Register with all provided names
-            registry_names = list(names)
-            if not registry_names:
-                registry_names = [tool_class.name]
+            # Also register in entries
+            self.entries[tool_class.name] = tool_class
             
-            for name in registry_names:
-                if name in self.entries and not self.config.allow_duplicates:
-                    raise KeyError(f"Tool '{name}' already registered")
-                    
-                # Validate tool schema if enabled
-                if self.config.validate_schemas:
-                    try:
-                        tool_instance = tool_class(config=config)
-                        tool_instance.get_schema()
-                    except Exception as e:
-                        logger.error(f"Tool schema validation failed for {name}: {str(e)}")
-                        raise ValueError(f"Invalid tool schema for {name}: {str(e)}")
-                
-                self.entries[name] = tool_class
-                logger.info(f"Registered tool '{name}' ({tool_class.__name__})")
+            # Add capability to tool class for reference
+            if not hasattr(tool_class, 'capabilities'):
+                tool_class.capabilities = []
+            if capability.value not in tool_class.capabilities:
+                tool_class.capabilities.append(capability.value)
             
+            logger.debug(f"Registered {tool_type} tool {tool_class.__name__} for capability {capability}")
             return tool_class
         return decorator
     
@@ -82,30 +77,70 @@ class ToolRegistry(BaseModel):
             logger.error(f"Failed to instantiate tool '{name}': {str(e)}")
             raise
     
-    def list_tools(self) -> Dict[str, Dict[str, Any]]:
-        """List all registered tools with their schemas"""
+    def list_tools(self) -> Dict[str, Any]:
+        """List all registered tools with their metadata and organization"""
         try:
-            tool_info = {}
+            # Organize by both type and capability
+            tool_info = {
+                "by_type": {
+                    "simple": [],
+                    "complex": []
+                },
+                "by_capability": {}
+            }
+
             for name, tool_class in self.entries.items():
-                try:
-                    # Get class-level attributes instead of instantiating
-                    tool_info[name] = {
-                        "name": name,
-                        "description": getattr(tool_class, "description", "No description available"),
-                        "version": getattr(tool_class, "version", "1.0.0"),
-                        "permissions": getattr(tool_class, "required_permissions", []),
-                        "parameters": getattr(tool_class, "parameters", {}),
-                        "type": "simple" if name in [t.name for tools in SIMPLE_TOOLS.values() for t in tools] else "complex"
-                    }
-                except Exception as e:
-                    logger.warning(f"Error getting info for tool {name}: {str(e)}")
-                    continue
-                
-            return tool_info
-            
+                tool_data = {
+                    "name": name,
+                    "description": getattr(tool_class, "description", "No description available"),
+                    "version": getattr(tool_class, "version", "1.0.0"),
+                    "permissions": getattr(tool_class, "required_permissions", []),
+                    "parameters": getattr(tool_class, "parameters", {}),
+                    "capabilities": getattr(tool_class, "capabilities", []),
+                    "dependencies": getattr(tool_class, "required_dependencies", {})
+                }
+
+                # Organize by type
+                if tool_data["dependencies"]:
+                    tool_info["by_type"]["complex"].append(tool_data)
+                else:
+                    tool_info["by_type"]["simple"].append(tool_data)
+
+                # Organize by capability
+                for capability in tool_data["capabilities"]:
+                    if capability not in tool_info["by_capability"]:
+                        tool_info["by_capability"][capability] = {
+                            "name": capability,
+                            "type": "complex" if tool_data["dependencies"] else "simple",
+                            "description": self._get_capability_description(capability),
+                            "requires_setup": bool(tool_data["dependencies"]),
+                            "setup_requirements": list(tool_data["dependencies"].keys()) if tool_data["dependencies"] else [],
+                            "tools": []
+                        }
+                    tool_info["by_capability"][capability]["tools"].append(tool_data)
+
+            return {
+                "tools": tool_info,
+                "total_count": len(self.entries),
+                "simple_count": len(tool_info["by_type"]["simple"]),
+                "complex_count": len(tool_info["by_type"]["complex"])
+            }
+
         except Exception as e:
             logger.error(f"Failed to list tools: {str(e)}")
             raise
+    
+    def _get_capability_description(self, capability: str) -> str:
+        """Get description for a capability"""
+        descriptions = {
+            "datetime": "Work with dates, times, and time zones",
+            "search": "Search and retrieve information from vector stores",
+            "memory": "Store and recall information from previous interactions",
+            "file_operations": "Handle file system operations",
+            "calculate": "Perform mathematical calculations",
+            "format": "Format and convert data between different formats"
+        }
+        return descriptions.get(capability, f"Capability for {capability}")
     
     def get_tool_names(self) -> List[str]:
         """Get list of registered tool names"""

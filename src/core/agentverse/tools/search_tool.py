@@ -6,6 +6,8 @@ from datetime import datetime
 from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, ToolExecutionError
 from src.core.agentverse.memory.vectorstore import VectorstoreService
 from src.core.agentverse.llm.base import BaseLLM
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.tools.types import AgentCapability, ToolType
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,7 @@ class SearchToolConfig(ToolConfig):
         "keyword": 0.3
     }
 
+@tool_registry.register(AgentCapability.SEARCH, ToolType.COMPLEX)
 class SearchTool(BaseTool):
     """Tool for semantic and hybrid search across knowledge bases"""
     
@@ -69,6 +72,10 @@ class SearchTool(BaseTool):
         }
     }
     required_permissions: ClassVar[List[str]] = ["search_access"]
+    required_dependencies = {
+        "vectorstore": "VectorstoreService",
+        "llm": "BaseLLM"
+    }
     
     def __init__(
         self,

@@ -14,28 +14,12 @@ class ToolService:
         self.registry = tool_registry
 
     async def list_tools(self) -> Dict[str, Any]:
-        """Get all available tools with their metadata"""
-        try:
-            tool_info = {}
-            for name, tool_class in self.registry.entries.items():
-                try:
-                    metadata = tool_class.get_metadata()
-                    tool_info[name] = {
-                        **metadata,
-                        "type": "simple" if name in [t.name for tools in SIMPLE_TOOLS.values() for t in tools] else "complex"
-                    }
-                except Exception as e:
-                    logger.warning(f"Error getting info for tool {name}: {str(e)}")
-                    continue
-            
-            return {
-                "tools": tool_info,
-                "count": len(tool_info)
-            }
-            
-        except Exception as e:
-            logger.error(f"Failed to list tools: {str(e)}")
-            raise
+        """Get all available tools with their schemas"""
+        tools_info = self.registry.list_tools()
+        return {
+            "tools": tools_info["tools"]["by_type"],  # Just return the type-organized tools
+            "count": tools_info["total_count"]
+        }
 
     async def get_tool(self, name: str) -> Dict[str, Any]:
         """Get specific tool information"""
@@ -61,46 +45,8 @@ class ToolService:
 
     async def list_capabilities(self) -> List[Dict[str, Any]]:
         """Get all available capabilities and their tools"""
-        capabilities = []
-        
-        # Add simple tools
-        for cap, tools in SIMPLE_TOOLS.items():
-            capabilities.append({
-                "name": cap.value,
-                "type": "simple",
-                "description": self._get_capability_description(cap),
-                "requires_setup": False,
-                "tools": [
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "version": tool.version,
-                        "parameters": tool.parameters
-                    }
-                    for tool in tools
-                ]
-            })
-            
-        # Add complex tools
-        for cap, tools in COMPLEX_TOOLS.items():
-            capabilities.append({
-                "name": cap.value,
-                "type": "complex",
-                "description": self._get_capability_description(cap),
-                "requires_setup": True,
-                "setup_requirements": self._get_setup_requirements(cap),
-                "tools": [
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "version": tool.version,
-                        "parameters": tool.parameters
-                    }
-                    for tool in tools
-                ]
-            })
-            
-        return capabilities
+        tools_info = self.registry.list_tools()
+        return list(tools_info["tools"]["by_capability"].values())  # Return capability-organized view
 
     def _get_capability_description(self, capability: AgentCapability) -> str:
         """Get human-readable description for a capability"""

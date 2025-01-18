@@ -1,8 +1,10 @@
 from datetime import datetime
 from typing import Dict, Any, ClassVar, Optional
-from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, ToolExecutionError
+from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig
 import pytz
 import logging
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.tools.types import AgentCapability, ToolType
 
 logger = logging.getLogger(__name__)
 
@@ -13,9 +15,9 @@ class DateTimeToolConfig(ToolConfig):
     allow_future_dates: bool = True
     max_past_years: int = 100
 
+@tool_registry.register(AgentCapability.DATETIME, ToolType.SIMPLE)
 class DateTimeTool(BaseTool):
-    """Tool for datetime operations and formatting"""
-    
+    """Tool for datetime operations"""
     name: ClassVar[str] = "datetime"
     description: ClassVar[str] = """
     Get current time, format dates, calculate time differences, and handle timezones.

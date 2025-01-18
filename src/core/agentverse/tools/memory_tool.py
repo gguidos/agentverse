@@ -6,6 +6,8 @@ from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, Too
 from src.core.agentverse.memory.base import Message
 from src.core.agentverse.memory.agent_memory import AgentMemoryStore
 from src.core.agentverse.llm.base import BaseLLM
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.tools.types import AgentCapability, ToolType
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +19,7 @@ class MemoryToolConfig(ToolConfig):
     max_context_length: int = 2000
     enable_summarization: bool = True
 
+@tool_registry.register(AgentCapability.MEMORY, ToolType.COMPLEX)
 class MemoryTool(BaseTool):
     """Tool for searching and analyzing agent memory"""
     

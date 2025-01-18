@@ -23,10 +23,9 @@ from .types import (
     SIMPLE_TOOLS,
     COMPLEX_TOOLS
 )
-from .capabilities import register_default_tools, initialize_tool_mappings
+from .capabilities import register_default_tools
 
-# Initialize tool mappings
-initialize_tool_mappings()
+# Tools are now registered via decorators, no need for initialization
 
 __all__ = [
     'BaseTool',
