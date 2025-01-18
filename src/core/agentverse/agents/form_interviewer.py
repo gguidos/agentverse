@@ -1,10 +1,12 @@
 from typing import Dict, Any, Optional
 from src.core.agentverse.agents.base_agent import BaseAgent
 from src.core.agentverse.memory.base import BaseMemory
+from src.core.agentverse.registry import agent_registry
 import logging
 
 logger = logging.getLogger(__name__)
 
+@agent_registry.register("form_interviewer")
 class FormInterviewerAgent(BaseAgent):
     """Agent for conducting form-based interviews"""
     
