@@ -1,5 +1,5 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
-from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
+from src.core.services.vectorstore_service import VectorstoreService
 from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
 import logging
 from typing import Dict, Any
@@ -12,7 +12,7 @@ router = APIRouter()
 async def create_vector_store(
     store_name: str,
     file: UploadFile = File(...),
-    orchestrator: VectorstoreOrchestratorService = Depends(get_vectorstore_orchestrator)
+    orchestrator: VectorstoreService = Depends(get_vectorstore_orchestrator)
 ):
     """Create a new vector store from file"""
     try:
@@ -25,7 +25,7 @@ async def create_vector_store(
         return {
             "status": "success",
             "data": result,
-            "message": f"Vector store '{store_name}' created successfully"
+            "message": f"Vectorstore '{store_name}' created successfully"
         }
         
     except HTTPException as he:
@@ -40,7 +40,7 @@ async def create_vector_store(
 
 @router.get("/vector-store", tags=["vectorstore"])
 async def list_vectorstores(
-    orchestrator: VectorstoreOrchestratorService = Depends(get_vectorstore_orchestrator)
+    orchestrator: VectorstoreService = Depends(get_vectorstore_orchestrator)
 ) -> Dict[str, Any]:
     """List all vector stores"""
     try:
@@ -61,7 +61,7 @@ async def list_vectorstores(
 @router.get("/vector-store/{store_name}", tags=["vectorstore"])
 async def get_vector_store(
     store_name: str,
-    orchestrator: VectorstoreOrchestratorService = Depends(get_vectorstore_orchestrator)
+    orchestrator: VectorstoreService = Depends(get_vectorstore_orchestrator)
 ):
     """Get details about a specific vector store"""
     try:

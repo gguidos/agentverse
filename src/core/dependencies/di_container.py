@@ -11,7 +11,7 @@ from src.core.services.check_duplicate import CheckDuplicateService
 from src.core.infrastructure.aws.s3 import S3Client
 from src.core.infrastructure.crypto.md5 import compute_md5, MD5Calculator
 from src.core.services.upload_file import UploadService
-from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
+from src.core.services.vectorstore_service import VectorstoreService
 from src.core.services.indexing import IndexingService
 from src.core.utils.calculate_chunk_ids import CalculateChunkIds
 from src.core.infrastructure.fs.split_document import SplitDocument
@@ -22,7 +22,7 @@ from src.core.repositories.agent_repository import AgentRepository
 from src.core.services.agent_service import AgentService
 from src.core.agentverse.tools.registry import tool_registry
 from src.core.agentverse.capabilities import register_default_tools
-from src.core.agentverse.memory.vectorstore import VectorstoreService
+from src.core.agentverse.memory.vectorstore import VectorstoreMemoryService
 from src.core.agentverse.memory.agent_memory import AgentMemoryStore
 from src.core.services.tool_service import ToolService
 from src.core.services.environment_service import EnvironmentService
@@ -138,7 +138,7 @@ class Container(containers.DeclarativeContainer):
     )
     
     vectorstore_orchestrator_service = providers.Factory(
-        VectorstoreOrchestratorService,
+        VectorstoreService,
         check_duplicate=check_duplicate_service,
         indexing_service=indexing_service,
         upload_service=upload_service
@@ -184,7 +184,7 @@ class Container(containers.DeclarativeContainer):
 
     # Update vectorstore service
     vectorstore_service = providers.Factory(
-        VectorstoreService,
+        VectorstoreMemoryService,
         embedding_service=embeddings_client,
         chroma_db=chroma_client
     )

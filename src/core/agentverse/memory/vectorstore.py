@@ -12,7 +12,7 @@ from src.core.agentverse.exceptions import MemoryStorageError
 
 logger = logging.getLogger(__name__)
 
-class VectorstoreService:
+class VectorstoreMemoryService:
     """Service for managing vector-based memory storage"""
     
     def __init__(

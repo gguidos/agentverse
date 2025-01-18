@@ -2,7 +2,6 @@ from typing import Dict, Any, List, Optional
 from datetime import datetime
 from src.core.repositories.agent_repository import AgentRepository
 from src.core.agentverse.factories import AgentFactory
-from src.core.agentverse.factories.agent import AgentFactoryConfig
 from src.core.agentverse.tools import (
     AgentCapability,
     SIMPLE_TOOLS,
@@ -258,3 +257,46 @@ class AgentService:
             agent_types.append(agent_info)
             
         return agent_types 
+
+    async def create_chat_session(self, agent_name: str) -> str:
+        try:
+            agent = await self.repository.find_by_name(agent_name)
+            if not agent:
+                raise ValueError(f"Agent {agent_name} not found")
+            
+            agent_instance = await self.factory.get_agent(
+                agent_id=agent["id"],
+                config=AgentConfig(**agent)
+            )
+            
+            logger.debug(f"Agent instance created: {agent_instance}")
+            await agent_instance.initialize()  # Make sure the agent is ready
+            
+            session_id = str(uuid.uuid4())
+            # Store or log the session if needed
+            return session_id
+            
+        except Exception as e:
+            logger.error(f"Error creating chat session: {str(e)}")
+            raise
+
+    async def chat(self, agent_name: str, session_id: str, message: str) -> str:
+        """Process a chat message"""
+        try:
+            agent = await self.repository.find_by_name(agent_name)
+            if not agent:
+                raise ValueError(f"Agent {agent_name} not found")
+            
+            # Get agent instance
+            agent_instance = await self.factory.get_agent(
+                agent_id=agent["id"],
+                config=AgentConfig(**agent)
+            )
+            
+            # Process message
+            response = await agent_instance.process_message(message)
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error in chat: {str(e)}")
+            raise 

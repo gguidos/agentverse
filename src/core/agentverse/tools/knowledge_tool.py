@@ -18,7 +18,7 @@ from plotly.subplots import make_subplots
 
 from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, ToolExecutionError
 from src.core.agentverse.llm.base import BaseLLM
-from src.core.agentverse.memory.vectorstore import VectorstoreService
+from src.core.agentverse.memory.vectorstore import VectorstoreMemoryService
 from src.core.agentverse.tools.registry import tool_registry
 from src.core.agentverse.tools.types import AgentCapability, ToolType
 
@@ -45,7 +45,7 @@ class KnowledgeTool(BaseTool):
     version: ClassVar[str] = "1.1.0"
     capabilities: ClassVar[List[str]] = [AgentCapability.KNOWLEDGE]
     required_dependencies = {
-        "vectorstore": "VectorstoreService",
+        "vectorstore": "VectorstoreMemoryService",
         "llm": "BaseLLM",
         "redis_client": "Redis"
     }
@@ -98,7 +98,7 @@ class KnowledgeTool(BaseTool):
     
     def __init__(
         self,
-        vectorstore: VectorstoreService,
+        vectorstore: VectorstoreMemoryService,
         llm: BaseLLM,
         redis_client: Redis,
         config: Optional[KnowledgeToolConfig] = None

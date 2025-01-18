@@ -6,14 +6,11 @@ class MemoryException(HTTPException):
     def __init__(self, detail: str, status_code: int = 500):
         super().__init__(status_code=status_code, detail=detail)
 
-class MemoryStorageError(MemoryException):
-    """Raised when memory storage operations fail"""
-    def __init__(self, detail: str, original_error: Optional[Exception] = None):
-        super().__init__(
-            detail=f"Memory storage error: {detail}",
-            status_code=500
-        )
-        self.original_error = original_error
+class MemoryStorageError(Exception):
+    """Base exception for memory storage errors"""
+    def __init__(self, message: str = "Memory storage error occurred"):
+        self.message = message
+        super().__init__(self.message)
 
 class MemoryRetrievalError(MemoryException):
     """Raised when memory retrieval operations fail"""

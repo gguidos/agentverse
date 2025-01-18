@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 
 from src.core.agentverse.tools.base import BaseTool, ToolResult, ToolConfig, ToolExecutionError
-from src.core.agentverse.memory.vectorstore import VectorstoreService
+from src.core.agentverse.memory.vectorstore import VectorstoreMemoryService
 from src.core.agentverse.llm.base import BaseLLM
 from src.core.agentverse.tools.registry import tool_registry
 from src.core.agentverse.tools.types import AgentCapability, ToolType
@@ -80,7 +80,7 @@ class SearchTool(BaseTool):
     
     def __init__(
         self,
-        vectorstore: VectorstoreService,
+        vectorstore: VectorstoreMemoryService,
         llm: Optional[BaseLLM] = None,
         config: Optional[SearchToolConfig] = None
     ):

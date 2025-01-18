@@ -1,12 +1,9 @@
 from typing import Dict, Any, Optional, List
 from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from pydantic import BaseModel
-from json import JSONEncoder
 import logging
-import uuid
-from src.core.agentverse.factories.agent import AgentFactoryConfig
-from src.core.dependencies.di_container import get_llm_service, get_agent_repository, get_agent_service
-from src.core.services.vectorstore_orchestrator_service import VectorstoreOrchestratorService
+from src.core.dependencies.di_container import get_llm_service, get_agent_service
+from src.core.services.vectorstore_service import VectorstoreService
 from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
 from src.core.services.agent_service import AgentService
 from fastapi.encoders import jsonable_encoder
@@ -70,45 +67,6 @@ async def list_agent_types(
             status_code=500,
             detail=f"Failed to list agent types: {str(e)}"
         )
-    
-@router.post("/vector-store/{store_name}")
-async def create_vector_store(
-    store_name: str,
-    file: UploadFile = File(...),
-    orchestrator: VectorstoreOrchestratorService = Depends(get_vectorstore_orchestrator)
-):
-    """Create a new vector store from file"""
-    try:
-        logger.info(f"Creating vector store '{store_name}' from file {file.filename}")
-        
-        # Validate file content
-        content = await file.read()
-        if not content:
-            raise HTTPException(
-                status_code=400,
-                detail="Empty file content"
-            )
-        
-        # Reset file position after validation
-        await file.seek(0)
-        
-        # Process file and create vectorstore
-        result = await orchestrator.process_file(file, store_name)
-        
-        return {
-            "status": "success",
-            "data": result,
-            "message": f"Vector store '{store_name}' created successfully"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating vector store: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to create vector store: {str(e)}"
-        )
 
 @router.get("/agents")
 @router.get("/agents/")
@@ -161,4 +119,54 @@ async def update_agent(
         raise HTTPException(
             status_code=500,
             detail=f"Error updating agent: {str(e)}"
+        )
+
+@router.post("/agents/{agent_name}/chat/session")
+async def create_chat_session(
+    agent_name: str,
+    agent_service: AgentService = Depends(get_agent_service)
+) -> Dict[str, Any]:
+    """Create a new chat session for an agent"""
+    try:
+        session_id = await agent_service.create_chat_session(agent_name)
+        logger.debug(f"Created chat session: {session_id}")  # Debug log
+        return {
+            "status": "success",
+            "session_id": session_id
+        }
+    except Exception as e:
+        logger.error(f"Error creating chat session: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
+        )
+
+@router.post("/agents/{agent_name}/chat/{session_id}")
+async def chat_with_agent(
+    agent_name: str,
+    session_id: str,
+    message: Dict[str, str],
+    agent_service: AgentService = Depends(get_agent_service)
+) -> Dict[str, Any]:
+    """Send a message to an agent"""
+    try:
+        response = await agent_service.chat(
+            agent_name,
+            session_id,
+            message["message"]
+        )
+
+        logger.info(response)
+        return {
+            "status": "success",
+            "data": {
+                "response": response
+            },
+            "message": "Message processed"
+        }
+    except Exception as e:
+        logger.error(f"Error in chat: {str(e)}")
+        raise HTTPException(
+            status_code=400,
+            detail=str(e)
         )

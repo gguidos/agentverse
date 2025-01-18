@@ -8,6 +8,7 @@ from src.core.agentverse.tools.base import BaseTool
 from src.core.agentverse.memory.base import BaseMemory
 from src.core.agentverse.exceptions import ConfigurationError
 from src.core.agentverse.agents.form_interviewer import FormInterviewerAgent
+from src.core.agentverse.registry import agent_registry
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,13 @@ class AgentFactory:
             
             # Create new agent
             config = config or AgentConfig(name=f"agent_{agent_id}")
+            agent_type = config.metadata.get("type", "base")  # or some default
+            logger.debug(f"Creating agent with type: {agent_type}")
+            if agent_registry.is_registered(agent_type):
+                agent_cls = agent_registry.get(agent_type)
+            else:
+                logger.warning(f"No registered agent class for type '{agent_type}'. Using BaseAgent.")
+                agent_cls = BaseAgent
             
             # Select tools based on capabilities
             selected_tools = self._select_tools(config.capabilities)
@@ -94,7 +102,7 @@ class AgentFactory:
             )
             
             # Create agent
-            agent = BaseAgent(
+            agent = agent_cls(
                 name=config.name,
                 llm=self.llm_service,
                 memory=memory,
@@ -250,7 +258,7 @@ class AgentFactory:
         self.metrics = AgentMetrics()
         logger.info(f"Reset {self.name}") 
     
-    async def get_agent(self, agent_id: str, config: AgentConfig) -> BaseAgent:
+    async def get_agent(self, agent_id: str, config: AgentConfig, session_id: str = None) -> BaseAgent:
         """Create agent instance based on type"""
         try:
             agent_type = config.metadata.get("type")
@@ -263,9 +271,10 @@ class AgentFactory:
                     parser=self.parser_service,
                     prompt_template=config.prompt_template,
                     tools=self.available_tools,
-                    metadata=config.metadata
+                    metadata=config.metadata,
+                    session_id=session_id
                 )
-                await agent.initialize()  # Add initialization if needed
+                await agent.initialize()
                 return agent
             
             raise ValueError(f"Unknown agent type: {agent_type}")

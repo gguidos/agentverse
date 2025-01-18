@@ -117,3 +117,12 @@ class AgentRepository:
             return self._serialize_agent(result) if result else None
         except Exception as e:
             raise ValueError(f"Failed to update agent: {str(e)}") 
+        
+    async def find_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+        """Find agent by name"""
+        try:
+            agent = await self.collection.find_one({"name": name})
+            return self._serialize_agent(agent)
+        except Exception as e:
+            logger.error(f"Error finding agent: {str(e)}")
+            raise 
