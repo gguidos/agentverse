@@ -1,41 +1,39 @@
+import os
+import logging
+from typing import Any
+from fastapi import Depends
 from dependency_injector import containers, providers
 from src.core.infrastructure.db.mongo_client import MongoDBClient
 from src.core.infrastructure.aws.get_embedings import GetEmbeddings
 from src.core.infrastructure.pika import PikaClient
-from src.core.repositories.db_repository import DBRepository
-from src.core.infrastructure.db.chromadb import ChromaDB
-from src.core.repositories.rabbitmq_repository import RabbitMQRepository
 from src.core.infrastructure.db.redis_client import RedisClient
-from src.core.services.openai_service import OpenAIService
-from src.core.services.check_duplicate import CheckDuplicateService
-from src.core.infrastructure.aws.s3 import S3Client
-from src.core.infrastructure.crypto.md5 import compute_md5, MD5Calculator
-from src.core.services.upload_file import UploadService
-from src.core.services.vectorstore_service import VectorstoreService
-from src.core.services.indexing import IndexingService
-from src.core.utils.calculate_chunk_ids import CalculateChunkIds
-from src.core.infrastructure.fs.split_document import SplitDocument
-from typing import Optional, Any
-from fastapi import Depends
-from src.core.agentverse.llm import get_llm
-from src.core.repositories.agent_repository import AgentRepository
-from src.core.services.agent_service import AgentService
-from src.core.agentverse.tools.registry import tool_registry
-from src.core.agentverse.capabilities import register_default_tools
-from src.core.agentverse.memory.vectorstore import VectorstoreMemoryService
-from src.core.agentverse.memory.agent_memory import AgentMemoryStore
-from src.core.services.tool_service import ToolService
-from src.core.services.environment_service import EnvironmentService
-from src.core.repositories.environment_repository import EnvironmentRepository
-import os
-import logging
-from langchain_community.vectorstores import Chroma
-from langchain.embeddings.base import Embeddings
 from src.core.infrastructure.vectorstore.chroma_client import ChromaClient
 from src.core.infrastructure.aws.get_embedings import GetEmbeddings
+from src.core.infrastructure.aws.s3 import S3Client
+from src.core.infrastructure.crypto.md5 import MD5Calculator
+from src.core.infrastructure.fs.split_document import SplitDocument
+from src.core.repositories.db_repository import DBRepository
+from src.core.repositories.rabbitmq_repository import RabbitMQRepository
+from src.core.repositories.agent_repository import AgentRepository
+from src.core.repositories.environment_repository import EnvironmentRepository
+from src.core.services.openai_service import OpenAIService
+from src.core.services.check_duplicate import CheckDuplicateService
+from src.core.services.upload_file import UploadService
+from src.core.services.vectorstore_service import VectorstoreService
+from src.core.services.chromaDB_service import ChromaDBService
+from src.core.services.agent_service import AgentService
 from src.core.services.memory_service import MemoryService
 from src.core.services.parser_service import ParserService
+from src.core.services.tool_service import ToolService
+from src.core.services.environment_service import EnvironmentService
+from src.core.services.parse_document_service import ParseDocumentService
+from src.core.agentverse.llm import get_llm
+from src.core.agentverse.tools.registry import tool_registry
+from src.core.agentverse.memory.vectorstore import VectorstoreMemoryService
+from src.core.agentverse.memory.agent_memory import AgentMemoryStore
 from src.core.agentverse.tools import ToolRegistry, tool_registry
+from src.core.utils.calculate_chunk_ids import CalculateChunkIds
+
 
 logger = logging.getLogger(__name__)
 
@@ -107,20 +105,19 @@ class Container(containers.DeclarativeContainer):
         embedding_function=embeddings_client
     )
 
+    parse_document_service = providers.Factory(
+        ParseDocumentService
+    )
+
     # Indexing service
     indexing_service = providers.Factory(
-        IndexingService,
+        ChromaDBService,
         chroma_db=chroma_client,
         split_document=split_document_client,
         calculate_chunk_ids=calculate_chunk_ids_client,
         embeddings_client=embeddings_client
     )
     
-    # Memory dependencies
-    embedding_service = providers.Singleton(
-        GetEmbeddings
-    )
-
     compute_md5 = providers.Singleton(
         MD5Calculator
     )
@@ -137,11 +134,16 @@ class Container(containers.DeclarativeContainer):
         s3_client=s3_client,
     )
     
-    vectorstore_orchestrator_service = providers.Factory(
+    vectorstore_service = providers.Factory(
         VectorstoreService,
         check_duplicate=check_duplicate_service,
+        parse_document_service=parse_document_service,
+        split_document=split_document_client,
+        calculate_chunk_ids=calculate_chunk_ids_client,
+        embeddings_client=embeddings_client,
         indexing_service=indexing_service,
-        upload_service=upload_service
+        upload_service=upload_service,
+        bucket_name=config.aws.documents_bucket
     )
 
     # RabbitMQ Client (Singleton)
@@ -183,7 +185,7 @@ class Container(containers.DeclarativeContainer):
     )
 
     # Update vectorstore service
-    vectorstore_service = providers.Factory(
+    vectorstore_memory_service = providers.Factory(
         VectorstoreMemoryService,
         embedding_service=embeddings_client,
         chroma_db=chroma_client
@@ -193,7 +195,7 @@ class Container(containers.DeclarativeContainer):
     memory_store = providers.Factory(
         AgentMemoryStore,
         redis_client=redis_client,
-        vectorstore=vectorstore_service
+        vectorstore=vectorstore_memory_service
     )
 
     # Tool registry with only required dependencies for simple tools

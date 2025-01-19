@@ -1,10 +1,8 @@
 from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 import logging
 from src.core.dependencies.di_container import get_llm_service, get_agent_service
-from src.core.services.vectorstore_service import VectorstoreService
-from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
 from src.core.services.agent_service import AgentService
 from fastapi.encoders import jsonable_encoder
 from bson import ObjectId

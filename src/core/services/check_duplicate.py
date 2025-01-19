@@ -21,12 +21,40 @@ class CheckDuplicateService:
         self.logger = logger
         self.bucket_name = bucket_name
 
-    async def check(self, file: UploadFile, store_name: str) -> bool:
-        """Check if file already exists in store"""
+    async def check(self, bucket_name: str, file_path: str, directory: str = None) -> bool:
+        """
+        Check if a file with the given checksum exists in the specified directory of the bucket.
+        """
         try:
-            logger.debug(f"Checking for duplicates in store {store_name}")
-            # Your duplicate checking logic here
+            # Compute MD5 of the file to be uploaded
+            ref_checksum = compute_md5(file_path)
+
+            # List files in the specified directory
+            files = self.s3_client.list_files(bucket_name, prefix=directory)
+
+            if not files:
+                self.logger.info(f"No files found in {directory or 'root'} of bucket {bucket_name}")
+                return False
+
+            for key in files:
+                # Skip directory markers
+                if key.endswith('/'):
+                    continue
+
+                metadata = self.s3_client.get_file_metadata(bucket_name, key)
+                checksum = metadata.get('md5hash')
+
+                if not checksum:
+                    self.logger.warning(f"File {key} does not have an 'md5' checksum in metadata")
+                    continue
+
+                if checksum == ref_checksum:
+                    self.logger.info(f"Duplicate found: File {key} matches the checksum")
+                    return True
+
+            self.logger.info("No duplicate found")
             return False
+
         except Exception as e:
-            logger.error(f"Error checking duplicates: {str(e)}", exc_info=True)
+            self.logger.error(f"Error checking for duplicates: {str(e)}")
             raise

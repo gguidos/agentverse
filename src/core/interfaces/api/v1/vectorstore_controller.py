@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from src.core.services.vectorstore_service import VectorstoreService
-from src.core.dependencies.vectorstore_orchestrator_dependency import get_vectorstore_orchestrator
+from src.core.dependencies.vectorstore_dependency import get_vectorstore_service
 import logging
 from typing import Dict, Any
 
@@ -8,18 +8,19 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-@router.post("/vector-store/{store_name}", tags=["vectorstore"])
+@router.post("/vector-store/{agent_type}/{store_name}", tags=["vectorstore"])
 async def create_vector_store(
+    agent_type: str,
     store_name: str,
     file: UploadFile = File(...),
-    orchestrator: VectorstoreService = Depends(get_vectorstore_orchestrator)
+    orchestrator: VectorstoreService = Depends(get_vectorstore_service)
 ):
     """Create a new vector store from file"""
     try:
         logger.info(f"Creating vector store '{store_name}' from file {file.filename}")
         logger.debug(f"Orchestrator instance: {orchestrator}")
-        
-        result = await orchestrator.process_file(file, store_name)
+        is_interviewer = (agent_type == "form_interviewer")
+        result = await orchestrator.process_file(file, store_name, is_interviewer)
         logger.debug(f"Process result: {result}")
         
         return {
@@ -40,7 +41,7 @@ async def create_vector_store(
 
 @router.get("/vector-store", tags=["vectorstore"])
 async def list_vectorstores(
-    orchestrator: VectorstoreService = Depends(get_vectorstore_orchestrator)
+    orchestrator: VectorstoreService = Depends(get_vectorstore_service)
 ) -> Dict[str, Any]:
     """List all vector stores"""
     try:
@@ -61,7 +62,7 @@ async def list_vectorstores(
 @router.get("/vector-store/{store_name}", tags=["vectorstore"])
 async def get_vector_store(
     store_name: str,
-    orchestrator: VectorstoreService = Depends(get_vectorstore_orchestrator)
+    orchestrator: VectorstoreService = Depends(get_vectorstore_service)
 ):
     """Get details about a specific vector store"""
     try:

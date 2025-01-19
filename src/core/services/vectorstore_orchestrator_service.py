@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 from src.core.services.check_duplicate import CheckDuplicateService
 import logging
 from langchain.schema.document import Document
-from src.core.services.indexing import IndexingService
+from server.src.core.services.chromaDB_service import IndexingService
 from src.core.services.upload_file import UploadService
 
 logger = logging.getLogger(__name__)
